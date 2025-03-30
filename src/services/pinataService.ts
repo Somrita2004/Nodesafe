@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -26,12 +27,29 @@ interface PinataFile {
   createdAt: string;
 }
 
+// Check if Pinata credentials are configured
+export function isPinataConfigured(): boolean {
+  return !!PINATA_API_KEY && !!PINATA_SECRET_API_KEY;
+}
+
+// Save Pinata credentials to localStorage
+export function savePinataCredentials(apiKey: string, secretApiKey: string): void {
+  localStorage.setItem('PINATA_API_KEY', apiKey);
+  localStorage.setItem('PINATA_SECRET_API_KEY', secretApiKey);
+  toast.success('Pinata credentials saved successfully!');
+}
+
 // Upload file to IPFS via Pinata
 export async function uploadFileToPinata(file: File): Promise<string | null> {
   const formData = new FormData();
   formData.append("file", file);
 
   try {
+    if (!isPinataConfigured()) {
+      toast.error("Pinata API credentials not configured");
+      return null;
+    }
+
     const response = await axios.post<PinataResponse>(PINATA_UPLOAD_URL, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -53,6 +71,11 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
 // Get list of files from Pinata
 export async function getFilesFromPinata(): Promise<PinataFile[]> {
   try {
+    if (!isPinataConfigured()) {
+      console.warn("Pinata API credentials not configured");
+      return mockFiles;
+    }
+
     const response = await axios.get(PINATA_FILES_URL, {
       headers: {
         pinata_api_key: PINATA_API_KEY,
@@ -71,7 +94,7 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
   } catch (error) {
     console.error("Error fetching files from Pinata:", error);
     toast.error("Failed to fetch files from IPFS");
-    return [];
+    return mockFiles;
   }
 }
 
