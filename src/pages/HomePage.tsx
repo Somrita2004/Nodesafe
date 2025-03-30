@@ -6,6 +6,7 @@ import FileDropZone from "@/components/FileDropZone";
 import PinataConfigForm from "@/components/PinataConfigForm";
 import { useNavigate } from "react-router-dom";
 import { isPinataConfigured } from "@/services/pinataService";
+import { toast } from "sonner";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,13 +21,17 @@ const HomePage: React.FC = () => {
     setIsConfigured(isPinataConfigured());
   };
 
-  const handleUploadComplete = () => {
-    navigate("/documents");
+  const handleUploadComplete = (fileUrl: string) => {
+    toast.success("File uploaded successfully!");
+    setTimeout(() => {
+      navigate("/documents");
+    }, 1500);
   };
 
   const handleConfigComplete = () => {
     setShowConfigForm(false);
     checkPinataConfig();
+    toast.success("Pinata configured successfully! You can now upload files.");
   };
 
   return (

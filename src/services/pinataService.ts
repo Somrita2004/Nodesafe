@@ -3,8 +3,8 @@ import axios from "axios";
 import { toast } from "sonner";
 
 // Pinata API configuration
-const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY || localStorage.getItem('PINATA_API_KEY') || '';
-const PINATA_SECRET_API_KEY = import.meta.env.VITE_PINATA_SECRET_API_KEY || localStorage.getItem('PINATA_SECRET_API_KEY') || '';
+const getPinataAPIKey = () => localStorage.getItem('PINATA_API_KEY') || '';
+const getPinataSecretAPIKey = () => localStorage.getItem('PINATA_SECRET_API_KEY') || '';
 
 // API endpoints
 const PINATA_UPLOAD_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
@@ -29,7 +29,9 @@ interface PinataFile {
 
 // Check if Pinata credentials are configured
 export function isPinataConfigured(): boolean {
-  return !!PINATA_API_KEY && !!PINATA_SECRET_API_KEY;
+  const apiKey = getPinataAPIKey();
+  const secretApiKey = getPinataSecretAPIKey();
+  return !!apiKey && !!secretApiKey;
 }
 
 // Save Pinata credentials to localStorage
@@ -50,11 +52,19 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
       return null;
     }
 
+    const apiKey = getPinataAPIKey();
+    const secretApiKey = getPinataSecretAPIKey();
+
+    if (!apiKey || !secretApiKey) {
+      toast.error("Pinata API credentials are missing");
+      return null;
+    }
+
     const response = await axios.post<PinataResponse>(PINATA_UPLOAD_URL, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
-        pinata_api_key: PINATA_API_KEY,
-        pinata_secret_api_key: PINATA_SECRET_API_KEY,
+        pinata_api_key: apiKey,
+        pinata_secret_api_key: secretApiKey,
       },
     });
 
@@ -63,7 +73,16 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
     return fileUrl;
   } catch (error) {
     console.error("Error uploading file to Pinata:", error);
-    toast.error("Failed to upload file to IPFS");
+    if (axios.isAxiosError(error) && error.response) {
+      console.error("API Error:", error.response.status, error.response.data);
+      if (error.response.status === 401) {
+        toast.error("Authentication failed. Please check your Pinata API credentials.");
+      } else {
+        toast.error(`Failed to upload file to IPFS: ${error.response.data.error || 'Unknown error'}`);
+      }
+    } else {
+      toast.error("Failed to upload file to IPFS. Network error.");
+    }
     return null;
   }
 }
@@ -76,10 +95,13 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
       return mockFiles;
     }
 
+    const apiKey = getPinataAPIKey();
+    const secretApiKey = getPinataSecretAPIKey();
+
     const response = await axios.get(PINATA_FILES_URL, {
       headers: {
-        pinata_api_key: PINATA_API_KEY,
-        pinata_secret_api_key: PINATA_SECRET_API_KEY,
+        pinata_api_key: apiKey,
+        pinata_secret_api_key: secretApiKey,
       },
     });
 

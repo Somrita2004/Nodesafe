@@ -53,10 +53,13 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
         if (onUploadComplete) {
           onUploadComplete(fileUrl);
         }
+      } else {
+        throw new Error("Upload failed - no file URL returned");
       }
     } catch (error) {
-      toast.error("Upload failed. Please try again.");
-      console.error(error);
+      clearInterval(progressInterval);
+      toast.error("Upload failed. Please check your Pinata API credentials.");
+      console.error("Upload error:", error);
     } finally {
       setUploading(false);
       // Reset after a delay
@@ -76,8 +79,8 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
       {!selectedFile ? (
         <div
           {...getRootProps()}
-          className={`file-drop-area ${
-            isDragActive ? "drag-active" : "border-muted-foreground/20"
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:border-primary/50"
           }`}
         >
           <input {...getInputProps()} />
@@ -97,7 +100,7 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
           </Button>
         </div>
       ) : (
-        <div className="border rounded-lg p-5 bg-card fadeInUp">
+        <div className="border rounded-lg p-5 bg-card">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center">
               <File className="w-8 h-8 text-primary mr-3" />
