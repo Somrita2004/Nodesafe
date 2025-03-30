@@ -45,6 +45,12 @@ export function savePinataCredentials(apiKey: string, secretApiKey: string): voi
 export async function uploadFileToPinata(file: File): Promise<string | null> {
   const formData = new FormData();
   formData.append("file", file);
+  
+  // Add file name metadata
+  const metadata = JSON.stringify({
+    name: file.name,
+  });
+  formData.append('pinataMetadata', metadata);
 
   try {
     if (!isPinataConfigured()) {
@@ -70,6 +76,15 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
 
     const fileHash = response.data.IpfsHash;
     const fileUrl = `${IPFS_GATEWAY}${fileHash}`;
+    
+    // Update localStorage with the new file (for offline access)
+    saveFileToLocalStorage({
+      ipfsHash: fileHash,
+      name: file.name,
+      size: file.size,
+      createdAt: new Date().toISOString()
+    });
+    
     return fileUrl;
   } catch (error) {
     console.error("Error uploading file to Pinata:", error);
@@ -87,12 +102,25 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
   }
 }
 
+// Save file info to localStorage for offline access
+function saveFileToLocalStorage(file: PinataFile) {
+  const existingFiles = getFilesFromLocalStorage();
+  const updatedFiles = [file, ...existingFiles.filter(f => f.ipfsHash !== file.ipfsHash)];
+  localStorage.setItem('PINATA_FILES', JSON.stringify(updatedFiles));
+}
+
+// Get files from localStorage
+function getFilesFromLocalStorage(): PinataFile[] {
+  const files = localStorage.getItem('PINATA_FILES');
+  return files ? JSON.parse(files) : [];
+}
+
 // Get list of files from Pinata
 export async function getFilesFromPinata(): Promise<PinataFile[]> {
   try {
     if (!isPinataConfigured()) {
       console.warn("Pinata API credentials not configured");
-      return mockFiles;
+      return getFilesFromLocalStorage();
     }
 
     const apiKey = getPinataAPIKey();
@@ -107,16 +135,21 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
 
     const files = response.data.rows.map((row: any) => ({
       ipfsHash: row.ipfs_pin_hash,
-      name: row.metadata.name || "Unnamed File",
+      name: row.metadata?.name || "Unnamed File",
       size: row.size,
       createdAt: row.date_pinned,
     }));
 
+    // Update localStorage cache
+    localStorage.setItem('PINATA_FILES', JSON.stringify(files));
+    
     return files;
   } catch (error) {
     console.error("Error fetching files from Pinata:", error);
-    toast.error("Failed to fetch files from IPFS");
-    return mockFiles;
+    toast.error("Failed to fetch files from IPFS. Using local cache.");
+    
+    // Return files from localStorage as a fallback
+    return getFilesFromLocalStorage();
   }
 }
 

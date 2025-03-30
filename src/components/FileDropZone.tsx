@@ -51,19 +51,26 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
       if (fileUrl) {
         toast.success("File uploaded successfully!");
         if (onUploadComplete) {
-          onUploadComplete(fileUrl);
+          setTimeout(() => {
+            onUploadComplete(fileUrl);
+          }, 1000); // Short delay to show the 100% progress
         }
       } else {
         throw new Error("Upload failed - no file URL returned");
       }
     } catch (error) {
       clearInterval(progressInterval);
-      toast.error("Upload failed. Please check your Pinata API credentials.");
       console.error("Upload error:", error);
+      if (error instanceof Error) {
+        toast.error(`Upload failed: ${error.message}`);
+      } else {
+        toast.error("Upload failed. Please check your Pinata API credentials.");
+      }
     } finally {
       setUploading(false);
       // Reset after a delay
       setTimeout(() => {
+        setUploading(false);
         setSelectedFile(null);
         setUploadProgress(0);
       }, 2000);
