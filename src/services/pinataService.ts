@@ -1,10 +1,9 @@
-
 import axios from "axios";
 import { toast } from "sonner";
 
 // Pinata API configuration
-const PINATA_API_KEY = "YOUR_PINATA_API_KEY"; // Replace with your Pinata API key
-const PINATA_SECRET_API_KEY = "YOUR_PINATA_SECRET_API_KEY"; // Replace with your Pinata Secret API key
+const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY || localStorage.getItem('PINATA_API_KEY') || '';
+const PINATA_SECRET_API_KEY = import.meta.env.VITE_PINATA_SECRET_API_KEY || localStorage.getItem('PINATA_SECRET_API_KEY') || '';
 
 // API endpoints
 const PINATA_UPLOAD_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
