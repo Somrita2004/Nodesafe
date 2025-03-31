@@ -1,25 +1,29 @@
 
 import React, { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, File, X } from "lucide-react";
+import { Upload, File, X, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatFileSize } from "@/lib/file-utils";
 import { uploadFileToPinata } from "@/services/pinataService";
+import { storeFileHash } from "@/services/web3Service";
 import { toast } from "sonner";
 
 interface FileDropZoneProps {
-  onUploadComplete?: (fileUrl: string) => void;
+  onUploadComplete?: (fileUrl: string, ipfsHash: string) => void;
 }
 
 const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [ipfsHash, setIpfsHash] = useState<string | null>(null);
+  const [storingOnChain, setStoringOnChain] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setSelectedFile(acceptedFiles[0]);
+      setIpfsHash(null); // Reset hash when new file is selected
     }
   }, []);
 
@@ -43,16 +47,20 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
     }, 200);
 
     try {
-      const fileUrl = await uploadFileToPinata(selectedFile);
+      const result = await uploadFileToPinata(selectedFile);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
       
-      if (fileUrl) {
-        toast.success("File uploaded successfully!");
+      if (result && result.fileUrl) {
+        // Extract the IPFS hash from the URL
+        const hash = result.ipfsHash || result.fileUrl.split('/').pop() || '';
+        setIpfsHash(hash);
+        
+        toast.success("File uploaded to IPFS successfully!");
         if (onUploadComplete) {
           setTimeout(() => {
-            onUploadComplete(fileUrl);
+            onUploadComplete(result.fileUrl, hash);
           }, 1000); // Short delay to show the 100% progress
         }
       } else {
@@ -68,17 +76,27 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
       }
     } finally {
       setUploading(false);
-      // Reset after a delay
-      setTimeout(() => {
-        setUploading(false);
-        setSelectedFile(null);
-        setUploadProgress(0);
-      }, 2000);
+    }
+  };
+
+  const handleStoreOnBlockchain = async () => {
+    if (!ipfsHash) return;
+    
+    setStoringOnChain(true);
+    try {
+      const success = await storeFileHash(ipfsHash);
+      if (success) {
+        toast.success("File hash stored on blockchain successfully!");
+      }
+    } finally {
+      setStoringOnChain(false);
     }
   };
 
   const removeFile = () => {
     setSelectedFile(null);
+    setIpfsHash(null);
+    setUploadProgress(0);
   };
 
   return (
@@ -118,7 +136,7 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
                 </p>
               </div>
             </div>
-            {!uploading && (
+            {!uploading && !ipfsHash && (
               <button
                 onClick={removeFile}
                 className="text-muted-foreground hover:text-destructive transition-colors"
@@ -136,6 +154,34 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onUploadComplete }) => {
                   ? "Uploading to IPFS..."
                   : "Upload complete!"}
               </p>
+            </div>
+          ) : ipfsHash ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-3">
+                <div className="flex items-center">
+                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                    File uploaded to IPFS
+                  </p>
+                </div>
+                <p className="text-xs mt-1 text-green-600 dark:text-green-300 break-all">
+                  IPFS Hash: {ipfsHash}
+                </p>
+              </div>
+              <Button 
+                className="w-full"
+                onClick={handleStoreOnBlockchain}
+                disabled={storingOnChain}
+              >
+                {storingOnChain ? "Storing on Blockchain..." : "Store on Blockchain"}
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={removeFile}
+              >
+                Upload Another File
+              </Button>
             </div>
           ) : (
             <Button onClick={handleUpload} className="w-full">

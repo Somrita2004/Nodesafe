@@ -4,6 +4,7 @@ import { Shield, Database, FileText, LockIcon, CloudUpload } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import FileDropZone from "@/components/FileDropZone";
 import PinataConfigForm from "@/components/PinataConfigForm";
+import WalletConnect from "@/components/WalletConnect";
 import { useNavigate } from "react-router-dom";
 import { isPinataConfigured } from "@/services/pinataService";
 import { toast } from "sonner";
@@ -21,7 +22,7 @@ const HomePage: React.FC = () => {
     setIsConfigured(isPinataConfigured());
   };
 
-  const handleUploadComplete = (fileUrl: string) => {
+  const handleUploadComplete = (fileUrl: string, ipfsHash: string) => {
     toast.success("File uploaded successfully!");
     setTimeout(() => {
       navigate("/documents");
@@ -44,11 +45,15 @@ const HomePage: React.FC = () => {
             </div>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">
-            Secure Document Storage with IPFS
+            Secure Document Storage with IPFS &amp; Ethereum
           </h1>
           <p className="text-xl text-muted-foreground mb-8">
-            Store your important files securely on the decentralized web with NodeSafe, powered by Pinata's IPFS technology.
+            Store your important files securely on IPFS and verify ownership with Ethereum blockchain technology.
           </p>
+          
+          <div className="flex justify-center mb-8">
+            <WalletConnect />
+          </div>
           
           {showConfigForm ? (
             <div className="space-y-4">
@@ -97,9 +102,9 @@ const HomePage: React.FC = () => {
                 <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                   <LockIcon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">Secure Storage</h3>
+                <h3 className="text-lg font-medium mb-2">Blockchain Verification</h3>
                 <p className="text-muted-foreground">
-                  Your files are stored on the decentralized IPFS network for enhanced security.
+                  Store your file hashes on Ethereum for immutable proof of ownership.
                 </p>
               </div>
 
@@ -109,7 +114,7 @@ const HomePage: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-medium mb-2">Access Anywhere</h3>
                 <p className="text-muted-foreground">
-                  Access your files from anywhere using the unique IPFS link generated for each document.
+                  Access your files from anywhere using IPFS, verified by the blockchain.
                 </p>
               </div>
             </div>
@@ -117,9 +122,9 @@ const HomePage: React.FC = () => {
             <div className="bg-card border rounded-lg p-8 md:p-10">
               <div className="flex flex-col md:flex-row items-center justify-between">
                 <div className="mb-6 md:mb-0 md:mr-10">
-                  <h2 className="text-2xl font-bold mb-4">Ready to store your documents securely?</h2>
+                  <h2 className="text-2xl font-bold mb-4">Ready for decentralized storage?</h2>
                   <p className="text-muted-foreground mb-6">
-                    Start uploading your files today and experience the benefits of decentralized storage.
+                    Store your files on IPFS and verify ownership with Ethereum blockchain technology.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
                     <Button size="lg" onClick={() => isConfigured ? null : setShowConfigForm(true)}>

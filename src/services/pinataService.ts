@@ -25,6 +25,12 @@ interface PinataFile {
   name: string;
   size: number;
   createdAt: string;
+  onBlockchain?: boolean;
+}
+
+interface UploadResult {
+  fileUrl: string;
+  ipfsHash: string;
 }
 
 // Check if Pinata credentials are configured
@@ -42,7 +48,7 @@ export function savePinataCredentials(apiKey: string, secretApiKey: string): voi
 }
 
 // Upload file to IPFS via Pinata
-export async function uploadFileToPinata(file: File): Promise<string | null> {
+export async function uploadFileToPinata(file: File): Promise<UploadResult | null> {
   const formData = new FormData();
   formData.append("file", file);
   
@@ -85,7 +91,7 @@ export async function uploadFileToPinata(file: File): Promise<string | null> {
       createdAt: new Date().toISOString()
     });
     
-    return fileUrl;
+    return { fileUrl, ipfsHash: fileHash };
   } catch (error) {
     console.error("Error uploading file to Pinata:", error);
     if (axios.isAxiosError(error) && error.response) {
@@ -138,6 +144,7 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
       name: row.metadata?.name || "Unnamed File",
       size: row.size,
       createdAt: row.date_pinned,
+      onBlockchain: false // Default to false, will be verified later
     }));
 
     // Update localStorage cache
