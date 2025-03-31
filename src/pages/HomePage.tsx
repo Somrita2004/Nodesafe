@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from "react";
-import { Shield, Database, FileText, LockIcon, CloudUpload } from "lucide-react";
+import { Shield, Database, FileText, LockIcon, CloudUpload, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FileDropZone from "@/components/FileDropZone";
+import EncryptedFileUpload from "@/components/EncryptedFileUpload";
 import PinataConfigForm from "@/components/PinataConfigForm";
 import WalletConnect from "@/components/WalletConnect";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +14,7 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [showConfigForm, setShowConfigForm] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [useEncryption, setUseEncryption] = useState(false);
 
   useEffect(() => {
     checkPinataConfig();
@@ -24,6 +26,17 @@ const HomePage: React.FC = () => {
 
   const handleUploadComplete = (fileUrl: string, ipfsHash: string) => {
     toast.success("File uploaded successfully!");
+    setTimeout(() => {
+      navigate("/documents");
+    }, 1500);
+  };
+
+  const handleEncryptedUploadComplete = (fileUrl: string, ipfsHash: string, encryptionInfo?: {
+    password: string;
+    salt: string;
+    name: string;
+  }) => {
+    toast.success("File encrypted and uploaded successfully!");
     setTimeout(() => {
       navigate("/documents");
     }, 1500);
@@ -69,7 +82,28 @@ const HomePage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {isConfigured ? (
-                <FileDropZone onUploadComplete={handleUploadComplete} />
+                <div className="space-y-6">
+                  <div className="flex justify-center space-x-4">
+                    <Button 
+                      variant={!useEncryption ? "default" : "outline"} 
+                      onClick={() => setUseEncryption(false)}
+                    >
+                      Standard Upload
+                    </Button>
+                    <Button 
+                      variant={useEncryption ? "default" : "outline"}
+                      onClick={() => setUseEncryption(true)}
+                    >
+                      Encrypted Upload
+                    </Button>
+                  </div>
+                  
+                  {useEncryption ? (
+                    <EncryptedFileUpload onUploadComplete={handleEncryptedUploadComplete} />
+                  ) : (
+                    <FileDropZone onUploadComplete={handleUploadComplete} />
+                  )}
+                </div>
               ) : (
                 <div className="border border-dashed border-gray-300 rounded-xl p-10 bg-card">
                   <h3 className="text-lg font-medium mb-4">Configure Pinata IPFS</h3>
@@ -90,31 +124,31 @@ const HomePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               <div className="bg-card border rounded-lg p-6 text-center">
                 <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CloudUpload className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">Easy Upload</h3>
-                <p className="text-muted-foreground">
-                  Simply drag and drop your files to securely upload them to IPFS.
-                </p>
-              </div>
-
-              <div className="bg-card border rounded-lg p-6 text-center">
-                <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                   <LockIcon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">Blockchain Verification</h3>
+                <h3 className="text-lg font-medium mb-2">End-to-End Encryption</h3>
                 <p className="text-muted-foreground">
-                  Store your file hashes on Ethereum for immutable proof of ownership.
+                  AES-256 encryption ensures your files remain private and secure.
                 </p>
               </div>
 
               <div className="bg-card border rounded-lg p-6 text-center">
                 <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-6 w-6 text-primary" />
+                  <MessageSquare className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">Access Anywhere</h3>
+                <h3 className="text-lg font-medium mb-2">Secure Messaging</h3>
                 <p className="text-muted-foreground">
-                  Access your files from anywhere using IPFS, verified by the blockchain.
+                  Share files directly through encrypted in-app messaging.
+                </p>
+              </div>
+
+              <div className="bg-card border rounded-lg p-6 text-center">
+                <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Blockchain Security</h3>
+                <p className="text-muted-foreground">
+                  Store your file hashes on Ethereum for permanent proof of ownership.
                 </p>
               </div>
             </div>
@@ -127,10 +161,19 @@ const HomePage: React.FC = () => {
                     Store your files on IPFS and verify ownership with Ethereum blockchain technology.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <Button size="lg" onClick={() => isConfigured ? null : setShowConfigForm(true)}>
-                      {isConfigured ? "Upload Now" : "Configure Pinata"}
+                    <Button 
+                      size="lg" 
+                      onClick={() => isConfigured ? navigate('/share') : setShowConfigForm(true)}
+                    >
+                      {isConfigured ? "Share Encrypted File" : "Configure Pinata"}
                     </Button>
-                    <Button variant="outline" size="lg">Learn More</Button>
+                    <Button 
+                      variant="outline" 
+                      size="lg"
+                      onClick={() => navigate('/about')}
+                    >
+                      Learn More
+                    </Button>
                   </div>
                 </div>
                 <div className="flex-shrink-0">
