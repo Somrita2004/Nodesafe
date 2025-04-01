@@ -9,7 +9,8 @@ import {
   Music, 
   Archive, 
   ExternalLink,
-  Shield
+  Shield,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatFileSize, formatDate, getFileType } from "@/lib/file-utils";
@@ -21,6 +22,7 @@ interface DocumentCardProps {
   size: number;
   createdAt: string;
   onBlockchain?: boolean;
+  isEncrypted?: boolean;
 }
 
 const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -28,12 +30,17 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
   name,
   size,
   createdAt,
-  onBlockchain = false
+  onBlockchain = false,
+  isEncrypted = false
 }) => {
   const fileType = getFileType(name);
   const [isStoring, setIsStoring] = React.useState(false);
   
   const renderIcon = () => {
+    if (isEncrypted) {
+      return <Lock className="h-10 w-10 text-purple-500" />;
+    }
+    
     switch (fileType) {
       case "document":
         return <FileText className="h-10 w-10 text-blue-500" />;
@@ -73,6 +80,12 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-lg truncate" title={name}>
                 {name}
+                {isEncrypted && (
+                  <span className="ml-2 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-full px-2 py-0.5 inline-flex items-center">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Encrypted
+                  </span>
+                )}
               </h3>
               {onBlockchain && (
                 <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full px-2 py-0.5 text-xs font-medium flex items-center ml-2">
@@ -97,15 +110,25 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
         >
           View Details
         </Link>
-        <a
-          href={ipfsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 p-2 text-center text-sm font-medium text-primary hover:bg-primary/5 transition-colors flex items-center justify-center"
-        >
-          Open File
-          <ExternalLink className="h-3.5 w-3.5 ml-1" />
-        </a>
+        {isEncrypted ? (
+          <Link
+            to={`/documents/${ipfsHash}`}
+            className="flex-1 p-2 text-center text-sm font-medium text-primary hover:bg-primary/5 transition-colors flex items-center justify-center"
+          >
+            Decrypt File
+            <Lock className="h-3.5 w-3.5 ml-1" />
+          </Link>
+        ) : (
+          <a
+            href={ipfsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 p-2 text-center text-sm font-medium text-primary hover:bg-primary/5 transition-colors flex items-center justify-center"
+          >
+            Open File
+            <ExternalLink className="h-3.5 w-3.5 ml-1" />
+          </a>
+        )}
       </div>
       
       {!onBlockchain && (

@@ -9,6 +9,7 @@ interface DocumentGridProps {
     size: number;
     createdAt: string;
     onBlockchain?: boolean;
+    isEncrypted?: boolean;
   }>;
 }
 
@@ -31,6 +32,7 @@ const DocumentGrid: React.FC<DocumentGridProps> = ({ documents }) => {
           size={doc.size}
           createdAt={doc.createdAt}
           onBlockchain={doc.onBlockchain}
+          isEncrypted={doc.isEncrypted}
         />
       ))}
     </div>

@@ -1,180 +1,136 @@
 
 import React, { useState, useEffect } from "react";
-import { Search, Upload, Filter, RefreshCw, Shield } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mockFiles } from "@/services/pinataService";
+import { getUserFileHashes } from "@/services/web3Service";
 import DocumentGrid from "@/components/DocumentGrid";
-import { getFilesFromPinata, isPinataConfigured } from "@/services/pinataService";
-import { getUserFileHashes, checkFileExists } from "@/services/web3Service";
-import WalletConnect from "@/components/WalletConnect";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import FileDropZone from "@/components/FileDropZone";
+import { Plus, Search, Shield, Filter } from "lucide-react";
 
 const DocumentsPage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [documents, setDocuments] = useState<Array<{ipfsHash: string; name: string; size: number; createdAt: string; onBlockchain?: boolean;}>>([]);
-  const [filteredDocuments, setFilteredDocuments] = useState<Array<{ipfsHash: string; name: string; size: number; createdAt: string; onBlockchain?: boolean;}>>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [showOnlyBlockchain, setShowOnlyBlockchain] = useState(false);
-  const navigate = useNavigate();
-
-  const fetchDocuments = async () => {
-    setIsLoading(true);
-    try {
-      // Check if Pinata is configured first
-      if (!isPinataConfigured()) {
-        toast.error("Pinata API credentials not configured. Please configure it first.");
-        navigate("/");
-        return;
-      }
-
-      const files = await getFilesFromPinata();
-      setDocuments(files);
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      toast.error("Failed to load documents. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const verifyBlockchainStatus = async () => {
-    if (documents.length === 0) return;
-    
-    setIsVerifying(true);
-    try {
-      // Get all hashes from the blockchain
-      const blockchainHashes = await getUserFileHashes();
-      
-      // Create a lookup set for O(1) search
-      const hashesSet = new Set(blockchainHashes);
-      
-      // Update documents with blockchain status
-      const updatedDocs = documents.map(doc => ({
-        ...doc,
-        onBlockchain: hashesSet.has(doc.ipfsHash)
-      }));
-      
-      setDocuments(updatedDocs);
-      toast.success("Blockchain verification complete");
-    } catch (error) {
-      console.error("Error verifying blockchain status:", error);
-      toast.error("Failed to verify blockchain status");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
+  const [documents, setDocuments] = useState(mockFiles);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<"all" | "encrypted" | "shared">("all");
+  const [verifiedHashes, setVerifiedHashes] = useState<string[]>([]);
+  
   useEffect(() => {
-    fetchDocuments();
+    // Simulate loading documents
+    // In a real app, this would be an API call
   }, []);
-
+  
   useEffect(() => {
-    if (documents.length > 0) {
-      // Verify blockchain status when documents are loaded
-      verifyBlockchainStatus();
+    verifyBlockchainStatus();
+  }, [documents]);
+  
+  const verifyBlockchainStatus = async () => {
+    try {
+      const userHashes = await getUserFileHashes();
+      setVerifiedHashes(userHashes);
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
     }
-  }, [documents.length]);
-
-  useEffect(() => {
-    let filtered = documents;
+  };
+  
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter(doc =>
-        doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    if (view === "all") return matchesSearch;
+    if (view === "encrypted") {
+      return matchesSearch && (
+        doc.name.endsWith('.enc') || 
+        doc.name.endsWith('.encrypted') || 
+        doc.isEncrypted
       );
     }
-    
-    // Filter by blockchain status if enabled
-    if (showOnlyBlockchain) {
-      filtered = filtered.filter(doc => doc.onBlockchain);
-    }
-    
-    setFilteredDocuments(filtered);
-  }, [searchQuery, documents, showOnlyBlockchain]);
-
-  const handleRefresh = () => {
-    fetchDocuments();
-    toast.success("Refreshing document list...");
-  };
-
-  const toggleBlockchainFilter = () => {
-    setShowOnlyBlockchain(!showOnlyBlockchain);
-  };
-
+    // Add more filters as needed
+    return matchesSearch;
+  });
+  
+  const documentsWithBlockchainStatus = filteredDocuments.map(doc => ({
+    ...doc,
+    onBlockchain: verifiedHashes.includes(doc.ipfsHash),
+    isEncrypted: doc.name.endsWith('.enc') || doc.name.endsWith('.encrypted') || doc.isEncrypted
+  }));
+  
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Your Documents</h1>
           <p className="text-muted-foreground">
-            All your securely stored documents in one place
+            Manage and access your decentralized files
           </p>
         </div>
-        <div className="flex gap-2 mt-4 md:mt-0">
-          <Button 
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="flex items-center"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button 
-            className="flex items-center"
-            onClick={() => navigate("/")}
-          >
-            <Upload className="mr-2 h-4 w-4" /> Upload New
+        
+        <div className="mt-4 sm:mt-0 space-x-2">
+          <Button asChild>
+            <Link to="/share">
+              <Plus className="mr-2 h-4 w-4" /> Upload File
+            </Link>
           </Button>
         </div>
       </div>
-
-      <div className="bg-card border rounded-lg p-6 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">Document List</h2>
-          <WalletConnect />
-        </div>
-        
-        <div className="flex flex-col md:flex-row gap-4">
+      
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search documents..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button 
-            variant={showOnlyBlockchain ? "default" : "outline"}
-            className="flex items-center"
-            onClick={toggleBlockchainFilter}
-          >
-            <Shield className="mr-2 h-4 w-4" /> 
-            {showOnlyBlockchain ? "Showing Blockchain Files" : "Show Blockchain Files"}
-          </Button>
-          <Button 
-            variant="outline" 
-            className="flex items-center"
-            onClick={verifyBlockchainStatus}
-            disabled={isVerifying}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isVerifying ? "animate-spin" : ""}`} /> 
-            Verify Blockchain
-          </Button>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon">
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon">
+              <Shield className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
-
-      {isLoading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading your documents...</p>
-        </div>
-      ) : (
-        <DocumentGrid documents={filteredDocuments} />
-      )}
+      
+      <Tabs defaultValue="all" className="mb-8" onValueChange={(value) => setView(value as any)}>
+        <TabsList>
+          <TabsTrigger value="all">All Files</TabsTrigger>
+          <TabsTrigger value="encrypted">Encrypted</TabsTrigger>
+          <TabsTrigger value="shared">Shared With Me</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="all" className="mt-6">
+          {documentsWithBlockchainStatus.length > 0 ? (
+            <DocumentGrid documents={documentsWithBlockchainStatus} />
+          ) : (
+            <FileDropZone />
+          )}
+        </TabsContent>
+        
+        <TabsContent value="encrypted" className="mt-6">
+          {documentsWithBlockchainStatus.filter(doc => doc.isEncrypted).length > 0 ? (
+            <DocumentGrid documents={documentsWithBlockchainStatus.filter(doc => doc.isEncrypted)} />
+          ) : (
+            <div className="text-center p-8 border border-dashed rounded-lg">
+              <p className="text-muted-foreground">No encrypted files found.</p>
+              <Button asChild className="mt-4">
+                <Link to="/share">Encrypt & Upload a File</Link>
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="shared" className="mt-6">
+          <div className="text-center p-8 border border-dashed rounded-lg">
+            <p className="text-muted-foreground">No shared files found.</p>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

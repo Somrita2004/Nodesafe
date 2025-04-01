@@ -10,12 +10,14 @@ import {
   FileText,
   Calendar,
   HardDrive,
-  CheckCircle
+  CheckCircle,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockFiles, getIpfsUrl } from "@/services/pinataService";
 import { formatFileSize, formatDate, getFileType } from "@/lib/file-utils";
 import { toast } from "sonner";
+import FileDecryption from "@/components/FileDecryption";
 
 const DocumentDetailPage: React.FC = () => {
   const { ipfsHash } = useParams<{ ipfsHash: string }>();
@@ -78,6 +80,7 @@ const DocumentDetailPage: React.FC = () => {
 
   const fileType = getFileType(document.name);
   const fileUrl = getIpfsUrl(document.ipfsHash);
+  const isEncrypted = document.name.endsWith('.enc') || document.name.endsWith('.encrypted') || document.isEncrypted;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -98,7 +101,15 @@ const DocumentDetailPage: React.FC = () => {
         <div className="lg:col-span-2">
           <div className="bg-card border rounded-lg overflow-hidden">
             <div className="p-8 flex flex-col items-center justify-center bg-muted/30 min-h-[300px]">
-              {fileType === "image" ? (
+              {isEncrypted ? (
+                <div className="text-center">
+                  <Lock className="h-20 w-20 mx-auto mb-4 text-purple-500/40" />
+                  <h3 className="text-xl font-medium mb-2">Encrypted File</h3>
+                  <p className="text-muted-foreground mb-4">
+                    This file is encrypted and requires a password to view
+                  </p>
+                </div>
+              ) : fileType === "image" ? (
                 <img 
                   src={fileUrl} 
                   alt={document.name} 
@@ -145,6 +156,16 @@ const DocumentDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {isEncrypted && (
+            <div className="mt-6">
+              <FileDecryption 
+                ipfsHash={document.ipfsHash} 
+                fileName={document.name}
+                salt={document.salt || ""}
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -174,22 +195,38 @@ const DocumentDetailPage: React.FC = () => {
                   <p className="font-medium">{formatDate(document.createdAt)}</p>
                 </div>
               </div>
+
+              {isEncrypted && (
+                <div className="flex items-center">
+                  <Lock className="h-5 w-5 text-purple-500 mr-3" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Encryption</p>
+                    <p className="font-medium">AES-256 Encrypted</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="bg-card border rounded-lg p-6">
             <h3 className="font-medium mb-4">Actions</h3>
             <div className="space-y-3">
-              <Button className="w-full justify-start" asChild>
-                <a 
-                  href={fileUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  download
-                >
-                  <Download className="mr-2 h-4 w-4" /> Download
-                </a>
-              </Button>
+              {isEncrypted ? (
+                <Button className="w-full justify-start" variant="default">
+                  <Lock className="mr-2 h-4 w-4" /> Decrypt File
+                </Button>
+              ) : (
+                <Button className="w-full justify-start" asChild>
+                  <a 
+                    href={fileUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    download
+                  >
+                    <Download className="mr-2 h-4 w-4" /> Download
+                  </a>
+                </Button>
+              )}
               
               <Button variant="outline" className="w-full justify-start" onClick={handleCopyLink}>
                 <Copy className="mr-2 h-4 w-4" /> Copy Link
