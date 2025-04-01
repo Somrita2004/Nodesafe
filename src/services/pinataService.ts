@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -47,14 +48,23 @@ export function savePinataCredentials(apiKey: string, secretApiKey: string): voi
   toast.success('Pinata credentials saved successfully!');
 }
 
+// Helper function to check if a file is encrypted
+export function isFileEncrypted(fileName: string): boolean {
+  return fileName.endsWith('.enc') || fileName.endsWith('.encrypted');
+}
+
 // Upload file to IPFS via Pinata
 export async function uploadFileToPinata(file: File): Promise<UploadResult | null> {
   const formData = new FormData();
   formData.append("file", file);
   
-  // Add file name metadata
+  // Check if file is encrypted
+  const isEncrypted = isFileEncrypted(file.name);
+  
+  // Add file name and encryption metadata
   const metadata = JSON.stringify({
     name: file.name,
+    isEncrypted: isEncrypted,
   });
   formData.append('pinataMetadata', metadata);
 
@@ -88,7 +98,8 @@ export async function uploadFileToPinata(file: File): Promise<UploadResult | nul
       ipfsHash: fileHash,
       name: file.name,
       size: file.size,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isEncrypted: isEncrypted
     });
     
     return { fileUrl, ipfsHash: fileHash };
@@ -139,14 +150,21 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
       },
     });
 
-    const files = response.data.rows.map((row: any) => ({
-      ipfsHash: row.ipfs_pin_hash,
-      name: row.metadata?.name || "Unnamed File",
-      size: row.size,
-      createdAt: row.date_pinned,
-      onBlockchain: false, // Default to false, will be verified later
-      isEncrypted: row.metadata?.name?.endsWith('.enc') || row.metadata?.name?.endsWith('.encrypted') || false
-    }));
+    const files = response.data.rows.map((row: any) => {
+      const fileName = row.metadata?.name || "Unnamed File";
+      const isFileEnc = row.metadata?.isEncrypted || 
+                        isFileEncrypted(fileName) || 
+                        false;
+                        
+      return {
+        ipfsHash: row.ipfs_pin_hash,
+        name: fileName,
+        size: row.size,
+        createdAt: row.date_pinned,
+        onBlockchain: false, // Default to false, will be verified later
+        isEncrypted: isFileEnc
+      };
+    });
 
     // Update localStorage cache
     localStorage.setItem('PINATA_FILES', JSON.stringify(files));
@@ -203,4 +221,11 @@ export const mockFiles: PinataFile[] = [
     createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
     isEncrypted: false
   },
+  {
+    ipfsHash: "QmSgvgwxZGMrjpySHrYZGYZ3JLxwvE4TEJ6u1Dpr5a2kKe",
+    name: "Secret Document.pdf.enc",
+    size: 1125789,
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    isEncrypted: true
+  }
 ];

@@ -1,23 +1,41 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockFiles } from "@/services/pinataService";
+import { mockFiles, getFilesFromPinata } from "@/services/pinataService";
 import { getUserFileHashes } from "@/services/web3Service";
 import DocumentGrid from "@/components/DocumentGrid";
 import FileDropZone from "@/components/FileDropZone";
 import { Plus, Search, Shield, Filter } from "lucide-react";
+import { toast } from "sonner";
 
 const DocumentsPage: React.FC = () => {
   const [documents, setDocuments] = useState(mockFiles);
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<"all" | "encrypted" | "shared">("all");
   const [verifiedHashes, setVerifiedHashes] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Simulate loading documents
-    // In a real app, this would be an API call
+    // Load real documents from Pinata
+    const loadDocuments = async () => {
+      try {
+        setIsLoading(true);
+        const files = await getFilesFromPinata();
+        if (files && files.length > 0) {
+          setDocuments(files);
+        }
+      } catch (error) {
+        console.error("Error loading documents:", error);
+        toast.error("Failed to load your documents");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadDocuments();
   }, []);
   
   useEffect(() => {
@@ -33,16 +51,20 @@ const DocumentsPage: React.FC = () => {
     }
   };
   
+  const isFileEncrypted = (doc: any) => {
+    return (
+      doc.name.endsWith('.enc') || 
+      doc.name.endsWith('.encrypted') || 
+      doc.isEncrypted === true
+    );
+  };
+  
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (view === "all") return matchesSearch;
     if (view === "encrypted") {
-      return matchesSearch && (
-        doc.name.endsWith('.enc') || 
-        doc.name.endsWith('.encrypted') || 
-        doc.isEncrypted === true
-      );
+      return matchesSearch && isFileEncrypted(doc);
     }
     // Add more filters as needed
     return matchesSearch;
@@ -51,7 +73,7 @@ const DocumentsPage: React.FC = () => {
   const documentsWithBlockchainStatus = filteredDocuments.map(doc => ({
     ...doc,
     onBlockchain: verifiedHashes.includes(doc.ipfsHash),
-    isEncrypted: doc.name.endsWith('.enc') || doc.name.endsWith('.encrypted') || doc.isEncrypted === true
+    isEncrypted: isFileEncrypted(doc)
   }));
   
   return (
@@ -104,7 +126,11 @@ const DocumentsPage: React.FC = () => {
         </TabsList>
         
         <TabsContent value="all" className="mt-6">
-          {documentsWithBlockchainStatus.length > 0 ? (
+          {isLoading ? (
+            <div className="text-center p-8">
+              <p className="text-muted-foreground">Loading your documents...</p>
+            </div>
+          ) : documentsWithBlockchainStatus.length > 0 ? (
             <DocumentGrid documents={documentsWithBlockchainStatus} />
           ) : (
             <FileDropZone />
@@ -112,7 +138,11 @@ const DocumentsPage: React.FC = () => {
         </TabsContent>
         
         <TabsContent value="encrypted" className="mt-6">
-          {documentsWithBlockchainStatus.filter(doc => doc.isEncrypted).length > 0 ? (
+          {isLoading ? (
+            <div className="text-center p-8">
+              <p className="text-muted-foreground">Loading your encrypted files...</p>
+            </div>
+          ) : documentsWithBlockchainStatus.filter(doc => doc.isEncrypted).length > 0 ? (
             <DocumentGrid documents={documentsWithBlockchainStatus.filter(doc => doc.isEncrypted)} />
           ) : (
             <div className="text-center p-8 border border-dashed rounded-lg">
