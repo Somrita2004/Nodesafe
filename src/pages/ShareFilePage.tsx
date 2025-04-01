@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { isPinataConfigured } from "@/services/pinataService";
 import { sendMessage } from "@/services/messagingService";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { FileAttachment } from "@/models/message";
 
 interface EncryptedFileInfo {
   ipfsHash: string;
@@ -83,15 +85,21 @@ const ShareFilePage: React.FC = () => {
 
     setSending(true);
     try {
+      // Create a FileAttachment object from the encrypted file info
+      const fileAttachment: FileAttachment = {
+        ipfsHash: encryptedFileInfo.ipfsHash,
+        name: encryptedFileInfo.fileName,
+        size: encryptedFileInfo.fileSize,
+        salt: encryptedFileInfo.salt,
+        isEncrypted: true
+      };
+
+      // Send message with the file attachment
       await sendMessage({
         sender: address,
         recipient: recipient,
-        ipfsHash: encryptedFileInfo.ipfsHash,
-        fileName: encryptedFileInfo.fileName,
-        fileSize: encryptedFileInfo.fileSize,
-        password: encryptedFileInfo.password,
-        salt: encryptedFileInfo.salt,
-        message: message,
+        content: message || "Shared an encrypted file with you",
+        attachments: [fileAttachment]
       });
 
       toast.success("Encrypted file shared successfully!");
