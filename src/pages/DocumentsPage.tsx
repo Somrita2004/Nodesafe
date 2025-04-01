@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ const DocumentsPage: React.FC = () => {
       return matchesSearch && (
         doc.name.endsWith('.enc') || 
         doc.name.endsWith('.encrypted') || 
-        doc.isEncrypted
+        doc.isEncrypted === true
       );
     }
     // Add more filters as needed
@@ -52,7 +51,7 @@ const DocumentsPage: React.FC = () => {
   const documentsWithBlockchainStatus = filteredDocuments.map(doc => ({
     ...doc,
     onBlockchain: verifiedHashes.includes(doc.ipfsHash),
-    isEncrypted: doc.name.endsWith('.enc') || doc.name.endsWith('.encrypted') || doc.isEncrypted
+    isEncrypted: doc.name.endsWith('.enc') || doc.name.endsWith('.encrypted') || doc.isEncrypted === true
   }));
   
   return (

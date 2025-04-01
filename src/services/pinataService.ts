@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -26,6 +25,7 @@ interface PinataFile {
   size: number;
   createdAt: string;
   onBlockchain?: boolean;
+  isEncrypted?: boolean;
 }
 
 interface UploadResult {
@@ -144,7 +144,8 @@ export async function getFilesFromPinata(): Promise<PinataFile[]> {
       name: row.metadata?.name || "Unnamed File",
       size: row.size,
       createdAt: row.date_pinned,
-      onBlockchain: false // Default to false, will be verified later
+      onBlockchain: false, // Default to false, will be verified later
+      isEncrypted: row.metadata?.name?.endsWith('.enc') || row.metadata?.name?.endsWith('.encrypted') || false
     }));
 
     // Update localStorage cache
@@ -172,29 +173,34 @@ export const mockFiles: PinataFile[] = [
     name: "Project Proposal.pdf",
     size: 2457862,
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    isEncrypted: false
   },
   {
     ipfsHash: "QmYXsKhvmLc3sH1a8CDgWNMVTwcZ8ftXnWUxvu2xQQA3R3",
     name: "Financial Report Q2.xlsx",
     size: 1254698,
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    isEncrypted: false
   },
   {
     ipfsHash: "QmZ2ThRZqBWh8VKgThxQUQ7Fzrd5VX8Jx5ZA4ZqxLnGLEb",
     name: "Client Meeting Notes.docx",
     size: 543289,
     createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    isEncrypted: false
   },
   {
     ipfsHash: "QmPZ9gcCEpqKTo6aq61g2nXGUhM4iCL3ewB6LDXZCtioEB",
     name: "Product Roadmap.png",
     size: 3254123,
     createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    isEncrypted: false
   },
   {
     ipfsHash: "QmSgvgwxZGMrjpySHrYZGYZ3JLxwvE4TEJ6u1Dpr5a2kKe",
     name: "Team Photo.jpg",
     size: 4125789,
     createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+    isEncrypted: false
   },
 ];
