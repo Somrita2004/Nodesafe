@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Shield, Upload, Copy, CheckCircle, Info } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import CryptoJS from 'crypto-js';
-import { pinFileToIPFS } from '@/services/pinataService';
+import { uploadFileToPinata } from '@/services/pinataService';
 import { toast } from 'sonner';
 
 interface EncryptedFileUploadProps {
@@ -103,14 +103,14 @@ const EncryptedFileUpload: React.FC<EncryptedFileUploadProps> = ({ onFileUploade
       const encryptedFile = new File([encryptedBlob], `${file.name}.enc`, { type: 'application/encrypted' });
       
       // Upload encrypted file to IPFS
-      const result = await pinFileToIPFS(encryptedFile);
+      const result = await uploadFileToPinata(encryptedFile);
       
-      if (result.success && result.hash) {
-        setUploadedHash(result.hash);
+      if (result && result.ipfsHash) {
+        setUploadedHash(result.ipfsHash);
         
         if (onFileUploaded) {
           onFileUploaded({
-            ipfsHash: result.hash,
+            ipfsHash: result.ipfsHash,
             fileName: file.name,
             fileSize: file.size,
             password: password,
@@ -234,7 +234,7 @@ const EncryptedFileUpload: React.FC<EncryptedFileUploadProps> = ({ onFileUploade
           </Alert>
         )}
         
-        <Alert variant="outline" className="bg-blue-500/5">
+        <Alert variant="default" className="bg-blue-500/5">
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle>How it works</AlertTitle>
           <AlertDescription className="text-sm">

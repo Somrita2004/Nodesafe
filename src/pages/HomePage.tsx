@@ -31,10 +31,12 @@ const HomePage: React.FC = () => {
     }, 1500);
   };
 
-  const handleEncryptedUploadComplete = (fileUrl: string, ipfsHash: string, encryptionInfo?: {
+  const handleEncryptedUploadComplete = (fileInfo: {
+    ipfsHash: string;
+    fileName: string;
+    fileSize: number;
     password: string;
     salt: string;
-    name: string;
   }) => {
     toast.success("File encrypted and uploaded successfully!");
     setTimeout(() => {
@@ -99,7 +101,7 @@ const HomePage: React.FC = () => {
                   </div>
                   
                   {useEncryption ? (
-                    <EncryptedFileUpload onUploadComplete={handleEncryptedUploadComplete} />
+                    <EncryptedFileUpload onFileUploaded={handleEncryptedUploadComplete} />
                   ) : (
                     <FileDropZone onUploadComplete={handleUploadComplete} />
                   )}
