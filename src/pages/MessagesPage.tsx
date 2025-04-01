@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { MessageSquare, Send, RefreshCw, Users } from "lucide-react";
+import { MessageSquare, Send, RefreshCw, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";

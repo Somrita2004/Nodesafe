@@ -1,10 +1,13 @@
 
 import React, { useState } from "react";
-import { Lock, Shield, Send, Copy, Check } from "lucide-react";
+import { Send, FileKey, Copy, Shield, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAccount } from "@/hooks/useAccount";
 import EncryptedFileUpload from "@/components/EncryptedFileUpload";
 import MessageForm from "@/components/MessageForm";
@@ -13,60 +16,59 @@ import { toast } from "sonner";
 const ShareFilePage: React.FC = () => {
   const { address } = useAccount();
   const [recipient, setRecipient] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<{
-    ipfsHash: string;
-    fileUrl: string;
-    name: string;
-    size: number;
-    password?: string;
-    salt?: string;
-    isEncrypted: boolean;
-  } | null>(null);
-  const [shareLink, setShareLink] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
-  
-  const handleUploadComplete = (fileUrl: string, ipfsHash: string, encryptionInfo?: {
+  const [fileUploaded, setFileUploaded] = useState(false);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState<{
+    ipfsHash: string;
+    fileName: string;
+    fileSize: number;
     password: string;
     salt: string;
-    name: string;
-  }) => {
-    const fileData = {
-      ipfsHash,
-      fileUrl,
-      name: encryptionInfo?.name || "Unnamed File",
-      size: 0, // We don't have the size info at this point
-      password: encryptionInfo?.password,
-      salt: encryptionInfo?.salt,
-      isEncrypted: !!encryptionInfo
-    };
+  } | null>(null);
+  
+  const getShareableLink = () => {
+    if (!uploadedFileInfo) return '';
     
-    setUploadedFile(fileData);
-    
-    // Generate a share link
     const baseUrl = window.location.origin;
-    const shareUrl = `${baseUrl}/documents/${ipfsHash}`;
-    setShareLink(shareUrl);
+    return `${baseUrl}/documents/${uploadedFileInfo.ipfsHash}`;
   };
   
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareLink);
+  const copyLinkToClipboard = () => {
+    const link = getShareableLink();
+    navigator.clipboard.writeText(link);
     setLinkCopied(true);
     toast.success("Link copied to clipboard");
-    setTimeout(() => setLinkCopied(false), 2000);
+    
+    setTimeout(() => {
+      setLinkCopied(false);
+    }, 3000);
+  };
+  
+  const handleFileUploaded = (fileInfo: {
+    ipfsHash: string;
+    fileName: string;
+    fileSize: number;
+    password: string;
+    salt: string;
+  }) => {
+    setUploadedFileInfo(fileInfo);
+    setFileUploaded(true);
   };
   
   const handleMessageSent = () => {
-    toast.success("Message with encrypted file sent successfully!");
-    setUploadedFile(null);
+    // Reset form after sending
     setRecipient("");
-    setShareLink("");
+    setFileUploaded(false);
+    setUploadedFileInfo(null);
+    
+    toast.success("File shared successfully!");
   };
   
   if (!address) {
     return (
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center">
-          <Shield className="h-12 w-12 mx-auto mb-4 text-primary/40" />
+          <FileKey className="h-12 w-12 mx-auto mb-4 text-primary/40" />
           <h1 className="text-2xl font-bold mb-2">Connect Your Wallet</h1>
           <p className="text-muted-foreground mb-6">
             Please connect your wallet to share encrypted files
@@ -78,142 +80,158 @@ const ShareFilePage: React.FC = () => {
   
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Share Encrypted Files</h1>
-        <p className="text-muted-foreground">
-          Upload, encrypt, and securely share your files
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Share Files Securely</h1>
+          <p className="text-muted-foreground">
+            End-to-end encrypted file sharing with password protection
+          </p>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <div className="bg-card border rounded-lg p-6">
-            <h2 className="text-xl font-medium mb-6">Upload & Encrypt</h2>
-            {!uploadedFile ? (
-              <EncryptedFileUpload onUploadComplete={handleUploadComplete} />
-            ) : (
-              <div className="space-y-6">
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
-                  <div className="flex items-center mb-2">
-                    <Shield className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                      File encrypted and uploaded successfully!
-                    </p>
-                  </div>
-                  <p className="text-xs mt-1 text-green-700 dark:text-green-300">
-                    {uploadedFile.name}
-                  </p>
-                  
-                  {uploadedFile.isEncrypted && uploadedFile.password && (
-                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-                      <div className="flex items-center mb-1">
-                        <Lock className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mr-2" />
-                        <p className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
-                          Decryption Password
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        <code className="text-xs bg-yellow-100 dark:bg-yellow-800/30 px-2 py-1 rounded mr-2 flex-1 overflow-x-auto">
-                          {uploadedFile.password}
-                        </code>
+      <Tabs defaultValue="message" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="message">Share via Message</TabsTrigger>
+          <TabsTrigger value="link">Share via Link</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="message" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <EncryptedFileUpload onFileUploaded={handleFileUploaded} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5 text-primary" />
+                  Send to Recipient
+                </CardTitle>
+                <CardDescription>
+                  Send the encrypted file link directly to another user
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="recipient" className="text-sm">Recipient Address</Label>
+                  <Input
+                    id="recipient"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="0x..."
+                    className="mt-1"
+                  />
+                </div>
+                
+                {uploadedFileInfo && (
+                  <Alert variant="outline" className="bg-green-500/5 border-green-500/20">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <AlertTitle>File Ready to Share</AlertTitle>
+                    <AlertDescription className="text-sm">
+                      {uploadedFileInfo.fileName} ({(uploadedFileInfo.fileSize / 1024 / 1024).toFixed(2)} MB)
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <MessageForm 
+                  sender={address} 
+                  recipient={recipient}
+                  onMessageSent={handleMessageSent}
+                  attachedFile={uploadedFileInfo ? {
+                    ipfsHash: uploadedFileInfo.ipfsHash,
+                    name: uploadedFileInfo.fileName,
+                    size: uploadedFileInfo.fileSize,
+                    salt: uploadedFileInfo.salt,
+                    isEncrypted: true,
+                    password: uploadedFileInfo.password
+                  } : undefined}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="link" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <EncryptedFileUpload onFileUploaded={handleFileUploaded} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Share Link & Password
+                </CardTitle>
+                <CardDescription>
+                  Share the link and password separately for maximum security
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {uploadedFileInfo ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="shareableLink">Shareable Link</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="shareableLink" 
+                          value={getShareableLink()} 
+                          readOnly 
+                          className="font-mono text-xs"
+                        />
                         <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            if (uploadedFile.password) {
-                              navigator.clipboard.writeText(uploadedFile.password);
-                              toast.success("Password copied to clipboard");
-                            }
-                          }}
-                          className="flex-shrink-0"
+                          variant="outline" 
+                          size="icon"
+                          onClick={copyLinkToClipboard}
                         >
-                          <Copy className="h-3 w-3" />
+                          {linkCopied ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                         </Button>
                       </div>
-                      <p className="text-xs mt-2 text-yellow-700 dark:text-yellow-300">
-                        Save this password. The recipient will need it to decrypt the file.
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="decryptionPassword">Decryption Password</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="decryptionPassword" 
+                          value={uploadedFileInfo.password} 
+                          readOnly 
+                          className="font-mono text-xs"
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(uploadedFileInfo.password);
+                            toast.success("Password copied to clipboard");
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Send this password through a separate secure channel
                       </p>
                     </div>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="shareLink" className="text-sm">Share Link</Label>
-                  <div className="flex mt-1">
-                    <Input
-                      id="shareLink"
-                      value={shareLink}
-                      readOnly
-                      className="flex-1 rounded-r-none"
-                    />
-                    <Button
-                      onClick={handleCopyLink}
-                      className="rounded-l-none"
-                      variant={linkCopied ? "success" : "default"}
-                    >
-                      {linkCopied ? (
-                        <>
-                          <Check className="h-4 w-4 mr-1" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-1" /> Copy
-                        </>
-                      )}
-                    </Button>
+                    
+                    <Alert variant="default" className="mt-4">
+                      <AlertTitle>Important Security Note</AlertTitle>
+                      <AlertDescription className="text-sm">
+                        For maximum security, share the link and password through different communication channels.
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileKey className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      Upload and encrypt a file first to get a shareable link
+                    </p>
                   </div>
-                </div>
-                
-                <Button
-                  onClick={() => {
-                    setUploadedFile(null);
-                    setShareLink("");
-                  }}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Upload Another File
-                </Button>
-              </div>
-            )}
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-        
-        <div>
-          <div className="bg-card border rounded-lg p-6 space-y-4">
-            <h2 className="text-lg font-medium">Share via Message</h2>
-            
-            <div>
-              <Label htmlFor="recipient" className="text-sm">Recipient Address</Label>
-              <Input
-                id="recipient"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                placeholder="0x..."
-                className="mt-1"
-              />
-            </div>
-            
-            <MessageForm 
-              sender={address} 
-              recipient={recipient}
-              onMessageSent={handleMessageSent}
-              attachedFile={uploadedFile || undefined}
-            />
-            
-            {!uploadedFile && (
-              <div className="p-4 bg-muted/30 rounded-md text-sm text-muted-foreground">
-                <p className="mb-2">Upload a file first to share it securely.</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>Files are encrypted before uploading</li>
-                  <li>Recipient needs the password to decrypt</li>
-                  <li>Messages are end-to-end encrypted</li>
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

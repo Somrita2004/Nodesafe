@@ -1,317 +1,270 @@
 
-import React, { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import { Upload, File, X, Shield, Lock, Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { formatFileSize } from "@/lib/file-utils";
-import { uploadFileToPinata } from "@/services/pinataService";
-import { encryptFile, generateSecurePassword } from "@/services/encryptionService";
-import { toast } from "sonner";
+import React, { useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Shield, Upload, Copy, CheckCircle, Info } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import CryptoJS from 'crypto-js';
+import { pinFileToIPFS } from '@/services/pinataService';
+import { toast } from 'sonner';
 
 interface EncryptedFileUploadProps {
-  onUploadComplete?: (fileUrl: string, ipfsHash: string, encryptionInfo?: {
+  onFileUploaded?: (fileInfo: {
+    ipfsHash: string;
+    fileName: string;
+    fileSize: number;
     password: string;
     salt: string;
-    name: string;
   }) => void;
 }
 
-const EncryptedFileUpload: React.FC<EncryptedFileUploadProps> = ({ onUploadComplete }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [ipfsHash, setIpfsHash] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
-  const [salt, setSalt] = useState("");
-  const [encryptedFileName, setEncryptedFileName] = useState("");
-  const [useEncryption, setUseEncryption] = useState(true);
-  const [useRandomPassword, setUseRandomPassword] = useState(true);
+const EncryptedFileUpload: React.FC<EncryptedFileUploadProps> = ({ onFileUploaded }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [password, setPassword] = useState('');
+  const [isGeneratingPassword, setIsGeneratingPassword] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedHash, setUploadedHash] = useState('');
+  const [salt, setSalt] = useState('');
   const [passwordCopied, setPasswordCopied] = useState(false);
-
+  
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      setSelectedFile(acceptedFiles[0]);
-      setIpfsHash(null);
-      
-      // Generate a random password when a file is selected
-      if (useRandomPassword) {
-        setPassword(generateSecurePassword());
-      }
+      setFile(acceptedFiles[0]);
     }
-  }, [useRandomPassword]);
-
+  }, []);
+  
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    multiple: false,
+    maxFiles: 1,
+    maxSize: 100 * 1024 * 1024, // 100MB
   });
-
-  const handleCopyPassword = () => {
-    navigator.clipboard.writeText(password);
-    setPasswordCopied(true);
-    toast.success("Password copied to clipboard");
-    setTimeout(() => setPasswordCopied(false), 2000);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-
+  
+  const generateRandomPassword = () => {
+    setIsGeneratingPassword(true);
+    
     try {
-      setUploading(true);
-      setUploadProgress(0);
-
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          const newProgress = prev + Math.random() * 5;
-          return newProgress > 70 ? 70 : newProgress;
-        });
-      }, 200);
-
-      // Read file as ArrayBuffer
-      const fileArrayBuffer = await selectedFile.arrayBuffer();
+      // Generate a secure random password (16 characters)
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
+      let result = '';
       
-      let uploadedFile: Blob;
-      let fileSalt = "";
+      // Use crypto API for more secure random generation
+      const randomValues = new Uint8Array(16);
+      window.crypto.getRandomValues(randomValues);
       
-      // Encrypt file if encryption is enabled
-      if (useEncryption) {
-        setUploadProgress(75);
-        const { encryptedData, salt } = await encryptFile(fileArrayBuffer, password);
-        fileSalt = salt;
-        setSalt(salt);
-        
-        // Convert encrypted string to Blob
-        const encryptedBlob = new Blob([encryptedData], { type: 'application/encrypted' });
-        uploadedFile = encryptedBlob;
-        
-        // Create an encrypted file name
-        const encFileName = `${selectedFile.name}.encrypted`;
-        setEncryptedFileName(encFileName);
-      } else {
-        uploadedFile = new Blob([fileArrayBuffer]);
-      }
-
+      randomValues.forEach(val => {
+        result += characters.charAt(val % characters.length);
+      });
+      
+      setPassword(result);
+    } catch (error) {
+      console.error('Error generating password:', error);
+      toast.error('Failed to generate a secure password');
+    } finally {
+      setIsGeneratingPassword(false);
+    }
+  };
+  
+  const encryptAndUploadFile = async () => {
+    if (!file) {
+      toast.error('Please select a file first');
+      return;
+    }
+    
+    if (!password) {
+      toast.error('Please enter or generate a password');
+      return;
+    }
+    
+    setIsUploading(true);
+    
+    try {
+      // Generate a random salt for encryption
+      const randomSalt = CryptoJS.lib.WordArray.random(128/8).toString(CryptoJS.enc.Hex);
+      setSalt(randomSalt);
+      
+      // Read the file as ArrayBuffer
+      const fileBuffer = await file.arrayBuffer();
+      
+      // Convert ArrayBuffer to WordArray (CryptoJS format)
+      const wordArray = CryptoJS.lib.WordArray.create(fileBuffer);
+      
+      // Encrypt the file with AES using the password and salt
+      const encrypted = CryptoJS.AES.encrypt(wordArray, password, { 
+        salt: CryptoJS.enc.Hex.parse(randomSalt)
+      }).toString();
+      
+      // Convert encrypted string to Blob for uploading
+      const encryptedBlob = new Blob([encrypted], { type: 'application/encrypted' });
+      
       // Create a File object from the Blob
-      const fileToUpload = new File(
-        [uploadedFile], 
-        useEncryption ? `${selectedFile.name}.encrypted` : selectedFile.name, 
-        { type: useEncryption ? 'application/encrypted' : selectedFile.type }
-      );
-
-      // Upload to Pinata
-      setUploadProgress(85);
-      const result = await uploadFileToPinata(fileToUpload);
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      const encryptedFile = new File([encryptedBlob], `${file.name}.enc`, { type: 'application/encrypted' });
       
-      if (result && result.fileUrl) {
-        const hash = result.ipfsHash || result.fileUrl.split('/').pop() || '';
-        setIpfsHash(hash);
+      // Upload encrypted file to IPFS
+      const result = await pinFileToIPFS(encryptedFile);
+      
+      if (result.success && result.hash) {
+        setUploadedHash(result.hash);
         
-        toast.success("File uploaded to IPFS successfully!");
-        
-        if (onUploadComplete) {
-          onUploadComplete(
-            result.fileUrl, 
-            hash,
-            useEncryption ? {
-              password,
-              salt: fileSalt,
-              name: selectedFile.name
-            } : undefined
-          );
+        if (onFileUploaded) {
+          onFileUploaded({
+            ipfsHash: result.hash,
+            fileName: file.name,
+            fileSize: file.size,
+            password: password,
+            salt: randomSalt
+          });
         }
+        
+        toast.success('File encrypted and uploaded successfully!');
       } else {
-        throw new Error("Upload failed - no file URL returned");
+        throw new Error('Failed to upload to IPFS');
       }
     } catch (error) {
-      console.error("Upload error:", error);
-      if (error instanceof Error) {
-        toast.error(`Upload failed: ${error.message}`);
-      } else {
-        toast.error("Upload failed. Please check your Pinata API credentials.");
-      }
+      console.error('Error encrypting and uploading:', error);
+      toast.error('Failed to encrypt and upload the file');
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
-
-  const removeFile = () => {
-    setSelectedFile(null);
-    setIpfsHash(null);
-    setUploadProgress(0);
-    setPassword(useRandomPassword ? generateSecurePassword() : "");
-    setSalt("");
+  
+  const copyPasswordToClipboard = () => {
+    navigator.clipboard.writeText(password);
+    setPasswordCopied(true);
+    toast.success('Password copied to clipboard');
+    
+    setTimeout(() => {
+      setPasswordCopied(false);
+    }, 3000);
   };
-
-  const toggleRandomPassword = () => {
-    setUseRandomPassword(!useRandomPassword);
-    if (!useRandomPassword) {
-      setPassword(generateSecurePassword());
-    } else {
-      setPassword("");
-    }
-  };
-
+  
   return (
-    <div className="w-full max-w-xl mx-auto">
-      <div className="mb-4 flex items-center space-x-2">
-        <Checkbox 
-          id="useEncryption" 
-          checked={useEncryption} 
-          onCheckedChange={(checked) => setUseEncryption(checked === true)} 
-        />
-        <Label htmlFor="useEncryption" className="cursor-pointer">Enable encryption</Label>
-      </div>
-
-      {!selectedFile ? (
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:border-primary/50"
-          }`}
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          Encrypted File Upload
+        </CardTitle>
+        <CardDescription>
+          Files are encrypted with AES-256 before uploading to IPFS
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        <div 
+          {...getRootProps()} 
+          className={`
+            border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
+            ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/20'}
+            ${file ? 'bg-muted/50' : ''}
+          `}
         >
           <input {...getInputProps()} />
-          <Upload
-            className={`w-12 h-12 mb-4 ${
-              isDragActive ? "text-primary" : "text-muted-foreground"
-            }`}
-          />
-          <p className="text-lg font-medium mb-1">
-            {isDragActive ? "Drop your file here" : "Drag & drop your file here"}
-          </p>
-          <p className="text-sm text-muted-foreground mb-4">
-            or click to browse from your computer
-          </p>
-          <Button variant="outline" size="sm">
-            Select File
-          </Button>
-        </div>
-      ) : (
-        <div className="border rounded-lg p-5 bg-card">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center">
-              <File className="w-8 h-8 text-primary mr-3" />
-              <div>
-                <p className="font-medium text-sm truncate max-w-xs">{selectedFile.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(selectedFile.size)}
-                </p>
-              </div>
-            </div>
-            {!uploading && !ipfsHash && (
-              <button
-                onClick={removeFile}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-
-          {useEncryption && (
-            <div className="space-y-3 mb-4 p-3 bg-muted/30 rounded-md">
-              <div className="flex items-center">
-                <Lock className="w-4 h-4 text-primary mr-2" />
-                <p className="text-sm font-medium">Encryption Settings</p>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="useRandomPassword" 
-                  checked={useRandomPassword} 
-                  onCheckedChange={() => toggleRandomPassword()} 
-                />
-                <Label htmlFor="useRandomPassword" className="cursor-pointer text-sm">
-                  Use random password
-                </Label>
-              </div>
-              
-              <div className="relative">
-                <Label htmlFor="password" className="text-xs block mb-1">
-                  Password (will not be stored)
-                </Label>
-                <div className="flex items-center">
-                  <Input
-                    id="password"
-                    type="text"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={useRandomPassword}
-                    placeholder="Enter password"
-                    className="pr-10"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    type="button" 
-                    onClick={handleCopyPassword}
-                    className="absolute right-0 h-full px-3"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {useRandomPassword ? "A secure random password has been generated" : "Choose a strong password"}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {uploading ? (
+          
+          {file ? (
             <div className="space-y-2">
-              <Progress value={uploadProgress} className="h-2" />
-              <p className="text-xs text-center text-muted-foreground">
-                {uploadProgress < 75
-                  ? "Preparing file..."
-                  : uploadProgress < 85
-                  ? "Encrypting file..."
-                  : uploadProgress < 100
-                  ? "Uploading to IPFS..."
-                  : "Upload complete!"}
+              <CheckCircle className="h-8 w-8 text-green-500 mx-auto" />
+              <p className="text-sm font-medium">{file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
-          ) : ipfsHash ? (
-            <div className="space-y-4">
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-3">
-                <div className="flex items-center">
-                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    File uploaded to IPFS
-                  </p>
-                </div>
-                <p className="text-xs mt-1 text-green-600 dark:text-green-300 break-all">
-                  IPFS Hash: {ipfsHash}
-                </p>
-                {useEncryption && (
-                  <div className="text-xs mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-                    <p className="font-medium text-yellow-800 dark:text-yellow-200">Keep your password safe!</p>
-                    <p className="text-yellow-700 dark:text-yellow-300">
-                      Anyone with this password can decrypt your file.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={removeFile}
-              >
-                Upload Another File
-              </Button>
-            </div>
           ) : (
-            <Button onClick={handleUpload} className="w-full">
-              {useEncryption ? "Encrypt & Upload" : "Upload to IPFS"}
-            </Button>
+            <div className="space-y-2">
+              <Upload className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+              <p className="text-sm text-muted-foreground">
+                {isDragActive ? 'Drop the file here' : 'Drag & drop a file here, or click to select'}
+              </p>
+            </div>
           )}
         </div>
-      )}
-    </div>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="password">Encryption Password</Label>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={generateRandomPassword}
+              disabled={isGeneratingPassword}
+              className="text-xs"
+            >
+              {isGeneratingPassword ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating...
+                </>
+              ) : (
+                'Generate Strong Password'
+              )}
+            </Button>
+          </div>
+          
+          <div className="flex gap-2">
+            <Input 
+              id="password" 
+              type="text" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter a strong password"
+              className="font-mono"
+            />
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={copyPasswordToClipboard}
+              disabled={!password}
+              size="icon"
+            >
+              {passwordCopied ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+        
+        {uploadedHash && (
+          <Alert className="bg-green-500/10 border-green-500/20">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertTitle>File Uploaded Successfully</AlertTitle>
+            <AlertDescription className="text-xs truncate">
+              IPFS Hash: {uploadedHash}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <Alert variant="outline" className="bg-blue-500/5">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertTitle>How it works</AlertTitle>
+          <AlertDescription className="text-sm">
+            1. Your file is encrypted with AES-256 in your browser
+            <br />
+            2. Only the encrypted version is uploaded to IPFS
+            <br />
+            3. The encryption password is never sent to any server
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+      
+      <CardFooter>
+        <Button 
+          onClick={encryptAndUploadFile}
+          disabled={!file || !password || isUploading}
+          className="w-full"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Encrypting & Uploading...
+            </>
+          ) : (
+            <>
+              <Shield className="mr-2 h-4 w-4" /> Encrypt & Upload
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
