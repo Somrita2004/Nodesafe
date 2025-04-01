@@ -51,34 +51,46 @@ export async function decryptFile(
       password + salt
     );
     
-    // Convert WordArray to Uint8Array
-    const bytes = decrypted.toString(CryptoJS.enc.Utf8);
-    if (!bytes) {
-      throw new Error("Decryption failed - incorrect password");
-    }
-    
-    // For binary data, we need to parse the Latin1 string back to bytes
-    const parseBase64 = (base64String: string) => {
-      const binaryString = atob(base64String);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes.buffer;
-    };
-    
-    try {
-      // Try to handle it as base64 encoded binary data
-      return parseBase64(bytes);
-    } catch (e) {
-      // If not base64, create a text blob
-      const textEncoder = new TextEncoder();
-      return textEncoder.encode(bytes).buffer;
-    }
+    // Convert to bytes
+    const typedArray = convertWordArrayToUint8Array(decrypted);
+    return typedArray.buffer;
   } catch (error) {
     console.error("Decryption failed:", error);
     throw new Error("Incorrect password or corrupted file");
   }
+}
+
+/**
+ * Convert CryptoJS WordArray to Uint8Array
+ * This helps properly handle binary data
+ */
+function convertWordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8Array {
+  const words = wordArray.words;
+  const sigBytes = wordArray.sigBytes;
+  const result = new Uint8Array(sigBytes);
+  
+  let offset = 0;
+  for (let i = 0; i < sigBytes; i += 4) {
+    const byte1 = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    result[offset++] = byte1;
+    
+    if (offset < sigBytes) {
+      const byte2 = (words[i >>> 2] >>> (16 - (i % 4) * 8)) & 0xff;
+      result[offset++] = byte2;
+    }
+    
+    if (offset < sigBytes) {
+      const byte3 = (words[i >>> 2] >>> (8 - (i % 4) * 8)) & 0xff;
+      result[offset++] = byte3;
+    }
+    
+    if (offset < sigBytes) {
+      const byte4 = (words[i >>> 2] >>> (0 - (i % 4) * 8)) & 0xff;
+      result[offset++] = byte4;
+    }
+  }
+  
+  return result;
 }
 
 /**

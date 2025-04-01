@@ -55,40 +55,46 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
       setDownloadProgress(70);
       toast.info("Decrypting file...");
       
-      // Decrypt the content
-      const decryptedData = await decryptFile(encryptedContent, password, salt);
-      console.log("Decryption successful, data size:", decryptedData.byteLength);
-      
-      setDownloadProgress(90);
-      
-      // Create a download link for the decrypted file
-      const blob = new Blob([decryptedData]);
-      const url = URL.createObjectURL(blob);
-      
-      // Figure out proper filename
-      let downloadFilename = fileName;
-      if (downloadFilename.endsWith('.encrypted') || downloadFilename.endsWith('.enc')) {
-        downloadFilename = downloadFilename.replace(/\.(encrypted|enc)$/, '');
+      try {
+        // Decrypt the content
+        const decryptedData = await decryptFile(encryptedContent, password, salt);
+        console.log("Decryption successful, data size:", decryptedData.byteLength);
+        
+        setDownloadProgress(90);
+        
+        // Create a download link for the decrypted file
+        const blob = new Blob([decryptedData]);
+        const url = URL.createObjectURL(blob);
+        
+        // Figure out proper filename
+        let downloadFilename = fileName;
+        if (downloadFilename.endsWith('.encrypted') || downloadFilename.endsWith('.enc')) {
+          downloadFilename = downloadFilename.replace(/\.(encrypted|enc)$/, '');
+        }
+        
+        // Create a temporary anchor and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadFilename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setDownloadProgress(100);
+        toast.success("File decrypted successfully!");
+      } catch (error) {
+        console.error("Decryption failed:", error);
+        setError("Incorrect password or corrupted file. Please try again.");
+        toast.error("Failed to decrypt file. Please check your password.");
       }
-      
-      // Create a temporary anchor and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = downloadFilename;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      setDownloadProgress(100);
-      toast.success("File decrypted successfully!");
     } catch (error) {
-      console.error("Decryption error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to decrypt file";
+      console.error("Download error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to download file";
       setError(errorMessage);
-      toast.error("Failed to decrypt file. Please check your password.");
+      toast.error("Failed to download encrypted file.");
     } finally {
       setDecrypting(false);
     }
