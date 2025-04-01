@@ -82,19 +82,20 @@ const EncryptedFileUpload: React.FC<EncryptedFileUploadProps> = ({ onFileUploade
     
     try {
       // Generate a random salt for encryption
-      const randomSalt = CryptoJS.lib.WordArray.random(128/8).toString(CryptoJS.enc.Hex);
+      const randomSalt = CryptoJS.lib.WordArray.random(128/8).toString();
       setSalt(randomSalt);
       
       // Read the file as ArrayBuffer
       const fileBuffer = await file.arrayBuffer();
       
       // Convert ArrayBuffer to WordArray (CryptoJS format)
-      const wordArray = CryptoJS.lib.WordArray.create(fileBuffer);
+      const wordArray = CryptoJS.lib.WordArray.create(
+        // @ts-ignore - CryptoJS types don't match perfectly with TypeScript's ArrayBuffer
+        new Uint8Array(fileBuffer)
+      );
       
       // Encrypt the file with AES using the password and salt
-      const encrypted = CryptoJS.AES.encrypt(wordArray, password, { 
-        salt: CryptoJS.enc.Hex.parse(randomSalt)
-      }).toString();
+      const encrypted = CryptoJS.AES.encrypt(wordArray.toString(CryptoJS.enc.Base64), password + randomSalt).toString();
       
       // Convert encrypted string to Blob for uploading
       const encryptedBlob = new Blob([encrypted], { type: 'application/encrypted' });

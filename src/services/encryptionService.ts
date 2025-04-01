@@ -51,22 +51,30 @@ export async function decryptFile(
       password + salt
     );
     
-    // Convert to Uint8Array
-    const typedArray = new Uint8Array(decrypted.words.length * 4);
-    let j = 0;
-    
-    // WordArray stores data in Big-Endian format, need to convert
-    for (let i = 0; i < decrypted.words.length; i++) {
-      const word = decrypted.words[i];
-      typedArray[j++] = (word >>> 24) & 0xff;
-      typedArray[j++] = (word >>> 16) & 0xff;
-      typedArray[j++] = (word >>> 8) & 0xff;
-      typedArray[j++] = word & 0xff;
+    // Convert WordArray to Uint8Array
+    const bytes = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!bytes) {
+      throw new Error("Decryption failed - incorrect password");
     }
     
-    // Remove padding bytes
-    const result = typedArray.slice(0, decrypted.sigBytes);
-    return result.buffer;
+    // For binary data, we need to parse the Latin1 string back to bytes
+    const parseBase64 = (base64String: string) => {
+      const binaryString = atob(base64String);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    };
+    
+    try {
+      // Try to handle it as base64 encoded binary data
+      return parseBase64(bytes);
+    } catch (e) {
+      // If not base64, create a text blob
+      const textEncoder = new TextEncoder();
+      return textEncoder.encode(bytes).buffer;
+    }
   } catch (error) {
     console.error("Decryption failed:", error);
     throw new Error("Incorrect password or corrupted file");

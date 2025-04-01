@@ -35,6 +35,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
     try {
       // Fetch the encrypted file from IPFS
       const fileUrl = getIpfsUrl(ipfsHash);
+      console.log("Fetching encrypted file from:", fileUrl);
       const response = await fetch(fileUrl);
       
       if (!response.ok) {
@@ -43,20 +44,26 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
       
       // Get the encrypted content as text
       const encryptedContent = await response.text();
+      console.log("Encrypted content length:", encryptedContent.length);
       
       // Decrypt the content
       const decryptedData = await decryptFile(encryptedContent, password, salt);
+      console.log("Decryption successful, data size:", decryptedData.byteLength);
       
       // Create a download link for the decrypted file
       const blob = new Blob([decryptedData]);
       const url = URL.createObjectURL(blob);
       
+      // Figure out proper filename
+      let downloadFilename = fileName;
+      if (downloadFilename.endsWith('.encrypted') || downloadFilename.endsWith('.enc')) {
+        downloadFilename = downloadFilename.replace(/\.(encrypted|enc)$/, '');
+      }
+      
       // Create a temporary anchor and trigger download
       const a = document.createElement('a');
       a.href = url;
-      a.download = fileName.endsWith('.encrypted') 
-        ? fileName.substring(0, fileName.length - 10) 
-        : fileName;
+      a.download = downloadFilename;
       document.body.appendChild(a);
       a.click();
       
