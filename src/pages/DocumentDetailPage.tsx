@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { 
@@ -14,7 +13,7 @@ import {
   Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { mockFiles, getIpfsUrl } from "@/services/pinataService";
+import { mockFiles, getIpfsUrl, getFilesFromPinata } from "@/services/pinataService";
 import { formatFileSize, formatDate, getFileType } from "@/lib/file-utils";
 import { toast } from "sonner";
 import FileDecryption from "@/components/FileDecryption";
@@ -26,14 +25,34 @@ const DocumentDetailPage: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Simulating API fetch
-    const fetchDocument = () => {
+    const fetchDocument = async () => {
       setLoading(true);
-      setTimeout(() => {
-        const foundDoc = mockFiles.find(file => file.ipfsHash === ipfsHash);
-        setDocument(foundDoc || null);
-        setLoading(false);
-      }, 500);
+      
+      const localStorageFiles = localStorage.getItem('PINATA_FILES');
+      const localFiles = localStorageFiles ? JSON.parse(localStorageFiles) : [];
+      const localDoc = localFiles.find((file: any) => file.ipfsHash === ipfsHash);
+      
+      if (localDoc) {
+        setDocument(localDoc);
+      } else {
+        const mockDoc = mockFiles.find(file => file.ipfsHash === ipfsHash);
+        if (mockDoc) {
+          setDocument(mockDoc);
+        }
+      }
+      
+      try {
+        const pinataFiles = await getFilesFromPinata();
+        const pinataDoc = pinataFiles.find(file => file.ipfsHash === ipfsHash);
+        
+        if (pinataDoc) {
+          setDocument(pinataDoc);
+        }
+      } catch (error) {
+        console.error("Error fetching document from Pinata:", error);
+      }
+      
+      setLoading(false);
     };
 
     fetchDocument();

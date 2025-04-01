@@ -22,6 +22,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
   const [password, setPassword] = useState("");
   const [decrypting, setDecrypting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   
   const handleDecrypt = async () => {
     if (!password) {
@@ -31,24 +32,34 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
 
     setDecrypting(true);
     setError(null);
+    setDownloadProgress(10);
     
     try {
       // Fetch the encrypted file from IPFS
       const fileUrl = getIpfsUrl(ipfsHash);
       console.log("Fetching encrypted file from:", fileUrl);
+      
+      toast.info("Downloading encrypted file...");
       const response = await fetch(fileUrl);
       
       if (!response.ok) {
         throw new Error(`Failed to download file: ${response.statusText}`);
       }
       
+      setDownloadProgress(50);
+      
       // Get the encrypted content as text
       const encryptedContent = await response.text();
       console.log("Encrypted content length:", encryptedContent.length);
       
+      setDownloadProgress(70);
+      toast.info("Decrypting file...");
+      
       // Decrypt the content
       const decryptedData = await decryptFile(encryptedContent, password, salt);
       console.log("Decryption successful, data size:", decryptedData.byteLength);
+      
+      setDownloadProgress(90);
       
       // Create a download link for the decrypted file
       const blob = new Blob([decryptedData]);
@@ -71,10 +82,12 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
+      setDownloadProgress(100);
       toast.success("File decrypted successfully!");
     } catch (error) {
       console.error("Decryption error:", error);
-      setError(error instanceof Error ? error.message : "Failed to decrypt file");
+      const errorMessage = error instanceof Error ? error.message : "Failed to decrypt file";
+      setError(errorMessage);
       toast.error("Failed to decrypt file. Please check your password.");
     } finally {
       setDecrypting(false);
@@ -100,11 +113,21 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter the file password"
             className="mt-1"
+            autoComplete="off"
           />
         </div>
         
         {error && (
           <p className="text-sm text-destructive">{error}</p>
+        )}
+        
+        {downloadProgress > 0 && downloadProgress < 100 && (
+          <div className="w-full bg-muted rounded-full h-2.5 mt-2">
+            <div
+              className="bg-primary h-2.5 rounded-full transition-all duration-300"
+              style={{ width: `${downloadProgress}%` }}
+            ></div>
+          </div>
         )}
         
         <Button

@@ -115,8 +115,8 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
             to={`/documents/${ipfsHash}`}
             className="flex-1 p-2 text-center text-sm font-medium text-primary hover:bg-primary/5 transition-colors flex items-center justify-center"
           >
+            <Lock className="h-3.5 w-3.5 mr-1" />
             Decrypt File
-            <Lock className="h-3.5 w-3.5 ml-1" />
           </Link>
         ) : (
           <a
