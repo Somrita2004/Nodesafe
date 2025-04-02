@@ -71,10 +71,14 @@ function convertWordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8A
   const sigBytes = wordArray.sigBytes;
   const result = new Uint8Array(sigBytes);
   
-  for (let i = 0; i < sigBytes; i++) {
+  let i = 0;
+  let byte = 0;
+  
+  for (let j = 0; j < sigBytes; j++) {
     // Extract byte from word
-    const byte = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    result[i] = byte;
+    byte = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    result[j] = byte;
+    i++;
   }
   
   return result;

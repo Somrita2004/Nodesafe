@@ -80,9 +80,44 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         setDecryptedObjectUrl(url);
         
         if (shouldOpenInBrowser) {
-          // Open the file in a new tab for viewing
-          window.open(url, '_blank');
-          toast.success("File opened in a new tab");
+          if (mimeType === 'application/pdf') {
+            // For PDFs, embed in an iframe or use a PDF viewer
+            const pdfViewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(url)}`;
+            const viewer = window.open('', '_blank');
+            if (viewer) {
+              viewer.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <title>${downloadFilename}</title>
+                  <style>
+                    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+                    #pdf-viewer { width: 100%; height: 100%; }
+                  </style>
+                </head>
+                <body>
+                  <embed id="pdf-viewer" src="${url}" type="application/pdf" width="100%" height="100%">
+                </body>
+                </html>
+              `);
+              viewer.document.close();
+              toast.success("PDF opened in a new tab");
+            } else {
+              // Fallback if popup is blocked
+              toast.error("Browser blocked opening new window. Check popup settings.");
+              // Try to download instead
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = downloadFilename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }
+          } else {
+            // For other file types, just open in a new tab
+            window.open(url, '_blank');
+            toast.success("File opened in a new tab");
+          }
         } else {
           // Create a download link and trigger the download
           const a = document.createElement('a');
