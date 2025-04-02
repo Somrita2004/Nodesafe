@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Download, FileText } from "lucide-react";
+import { Lock, Download, FileText, Eye } from "lucide-react";
 import { decryptFile } from "@/services/encryptionService";
 import { getIpfsUrl } from "@/services/pinataService";
 import { toast } from "sonner";
@@ -23,8 +23,9 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
   const [decrypting, setDecrypting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [decryptedObjectUrl, setDecryptedObjectUrl] = useState<string | null>(null);
   
-  const handleDecrypt = async () => {
+  const handleDecrypt = async (shouldOpenInBrowser = false) => {
     if (!password) {
       setError("Please enter the decryption password");
       return;
@@ -72,26 +73,37 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         const mimeType = getMimeType(downloadFilename);
         const blob = new Blob([decryptedData], { type: mimeType || 'application/octet-stream' });
         
-        // Create a download link and trigger the download
+        // Create a URL for the blob
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = downloadFilename;
-        document.body.appendChild(a);
         
-        // Use a small delay to ensure the browser has time to process the blob
-        setTimeout(() => {
-          a.click();
+        // Save the URL for in-browser viewing
+        setDecryptedObjectUrl(url);
+        
+        if (shouldOpenInBrowser) {
+          // Open the file in a new tab for viewing
+          window.open(url, '_blank');
+          toast.success("File opened in a new tab");
+        } else {
+          // Create a download link and trigger the download
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = downloadFilename;
+          document.body.appendChild(a);
           
-          // Clean up
+          // Use a small delay to ensure the browser has time to process the blob
           setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            a.click();
+            
+            // Clean up the download element
+            setTimeout(() => {
+              document.body.removeChild(a);
+            }, 100);
           }, 100);
-        }, 100);
+          
+          toast.success("File decrypted and downloaded successfully!");
+        }
         
         setDownloadProgress(100);
-        toast.success("File decrypted and downloaded successfully!");
       } catch (error) {
         console.error("Decryption failed:", error);
         setError("Incorrect password or corrupted file. Please try again.");
@@ -106,6 +118,15 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
       setDecrypting(false);
     }
   };
+  
+  // Clean up the object URL when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (decryptedObjectUrl) {
+        URL.revokeObjectURL(decryptedObjectUrl);
+      }
+    };
+  }, [decryptedObjectUrl]);
   
   // Helper function to determine MIME type based on file extension
   const getMimeType = (filename: string): string | null => {
@@ -176,19 +197,44 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
           </div>
         )}
         
-        <Button
-          onClick={handleDecrypt}
-          disabled={decrypting || !password}
-          className="w-full"
-        >
-          {decrypting ? (
-            <>Decrypting...</>
-          ) : (
-            <>
-              <Download className="mr-2 h-4 w-4" /> Decrypt & Download
-            </>
-          )}
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            onClick={() => handleDecrypt(false)}
+            disabled={decrypting || !password}
+            variant="default"
+            className="w-full"
+          >
+            {decrypting ? (
+              <>Decrypting...</>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" /> Download
+              </>
+            )}
+          </Button>
+          
+          <Button
+            onClick={() => handleDecrypt(true)}
+            disabled={decrypting || !password}
+            variant="outline"
+            className="w-full"
+          >
+            <Eye className="mr-2 h-4 w-4" /> View in Browser
+          </Button>
+        </div>
+        
+        {decryptedObjectUrl && (
+          <div className="pt-2">
+            <a 
+              href={decryptedObjectUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary text-sm hover:underline flex items-center"
+            >
+              <FileText className="h-4 w-4 mr-1" /> View decrypted file
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

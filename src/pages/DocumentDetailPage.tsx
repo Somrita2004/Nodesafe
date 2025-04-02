@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { 
@@ -10,7 +11,8 @@ import {
   Calendar,
   HardDrive,
   CheckCircle,
-  Lock
+  Lock,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mockFiles, getIpfsUrl, getFilesFromPinata } from "@/services/pinataService";
@@ -231,9 +233,14 @@ const DocumentDetailPage: React.FC = () => {
             <h3 className="font-medium mb-4">Actions</h3>
             <div className="space-y-3">
               {isEncrypted ? (
-                <Button className="w-full justify-start" variant="default">
-                  <Lock className="mr-2 h-4 w-4" /> Decrypt File
-                </Button>
+                <>
+                  <Button className="w-full justify-start" variant="default">
+                    <Lock className="mr-2 h-4 w-4" /> Decrypt File
+                  </Button>
+                  <Button className="w-full justify-start" variant="outline">
+                    <Eye className="mr-2 h-4 w-4" /> View in Browser
+                  </Button>
+                </>
               ) : (
                 <Button className="w-full justify-start" asChild>
                   <a 
