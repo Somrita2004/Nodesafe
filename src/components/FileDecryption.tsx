@@ -7,6 +7,7 @@ import { Lock, Download, FileText, Eye } from "lucide-react";
 import { decryptFile } from "@/services/encryptionService";
 import { getIpfsUrl } from "@/services/pinataService";
 import { toast } from "sonner";
+import PdfViewer from "./PdfViewer";
 
 interface FileDecryptionProps {
   ipfsHash: string;
@@ -24,6 +25,8 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [decryptedObjectUrl, setDecryptedObjectUrl] = useState<string | null>(null);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [decryptedFileName, setDecryptedFileName] = useState(fileName);
   
   const handleDecrypt = async (shouldOpenInBrowser = false) => {
     if (!password) {
@@ -69,6 +72,8 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
           downloadFilename = downloadFilename.replace(/\.(encrypted|enc)$/, '');
         }
         
+        setDecryptedFileName(downloadFilename);
+        
         // Create a Blob with the appropriate type if possible
         const mimeType = getMimeType(downloadFilename);
         const blob = new Blob([decryptedData], { type: mimeType || 'application/octet-stream' });
@@ -81,38 +86,8 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         
         if (shouldOpenInBrowser) {
           if (mimeType === 'application/pdf') {
-            // For PDFs, embed in an iframe or use a PDF viewer
-            const pdfViewerUrl = `/pdf-viewer.html?file=${encodeURIComponent(url)}`;
-            const viewer = window.open('', '_blank');
-            if (viewer) {
-              viewer.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <title>${downloadFilename}</title>
-                  <style>
-                    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-                    #pdf-viewer { width: 100%; height: 100%; }
-                  </style>
-                </head>
-                <body>
-                  <embed id="pdf-viewer" src="${url}" type="application/pdf" width="100%" height="100%">
-                </body>
-                </html>
-              `);
-              viewer.document.close();
-              toast.success("PDF opened in a new tab");
-            } else {
-              // Fallback if popup is blocked
-              toast.error("Browser blocked opening new window. Check popup settings.");
-              // Try to download instead
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = downloadFilename;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-            }
+            // For PDFs, use our custom PDF viewer
+            setShowPdfViewer(true);
           } else {
             // For other file types, just open in a new tab
             window.open(url, '_blank');
@@ -196,6 +171,16 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
     return extension && extension in mimeTypes ? mimeTypes[extension] : null;
   };
   
+  if (showPdfViewer && decryptedObjectUrl) {
+    return (
+      <PdfViewer 
+        pdfUrl={decryptedObjectUrl} 
+        fileName={decryptedFileName}
+        onBack={() => setShowPdfViewer(false)}
+      />
+    );
+  }
+  
   return (
     <div className="border rounded-lg p-4 bg-card">
       <div className="flex items-center mb-3">
@@ -258,7 +243,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
           </Button>
         </div>
         
-        {decryptedObjectUrl && (
+        {decryptedObjectUrl && !showPdfViewer && (
           <div className="pt-2">
             <a 
               href={decryptedObjectUrl} 

@@ -72,12 +72,21 @@ function convertWordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8A
   const result = new Uint8Array(sigBytes);
   
   let i = 0;
-  let byte = 0;
   
   for (let j = 0; j < sigBytes; j++) {
-    // Extract byte from word
-    byte = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    // Get the current word
+    const currentWord = words[i >>> 2];
+    
+    // Calculate bit position within the word
+    const bitPosition = (i % 4) * 8;
+    
+    // Extract byte from word (accounting for big-endian format)
+    const byte = (currentWord >>> (24 - bitPosition)) & 0xff;
+    
+    // Assign byte to result
     result[j] = byte;
+    
+    // Move to next byte
     i++;
   }
   
