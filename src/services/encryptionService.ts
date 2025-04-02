@@ -53,6 +53,8 @@ export async function decryptFile(
     
     // Convert to bytes
     const typedArray = convertWordArrayToUint8Array(decrypted);
+    
+    // Return as ArrayBuffer for download
     return typedArray.buffer;
   } catch (error) {
     console.error("Decryption failed:", error);
@@ -69,25 +71,10 @@ function convertWordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8A
   const sigBytes = wordArray.sigBytes;
   const result = new Uint8Array(sigBytes);
   
-  let offset = 0;
-  for (let i = 0; i < sigBytes; i += 4) {
-    const byte1 = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-    result[offset++] = byte1;
-    
-    if (offset < sigBytes) {
-      const byte2 = (words[i >>> 2] >>> (16 - (i % 4) * 8)) & 0xff;
-      result[offset++] = byte2;
-    }
-    
-    if (offset < sigBytes) {
-      const byte3 = (words[i >>> 2] >>> (8 - (i % 4) * 8)) & 0xff;
-      result[offset++] = byte3;
-    }
-    
-    if (offset < sigBytes) {
-      const byte4 = (words[i >>> 2] >>> (0 - (i % 4) * 8)) & 0xff;
-      result[offset++] = byte4;
-    }
+  for (let i = 0; i < sigBytes; i++) {
+    // Extract byte from word
+    const byte = (words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+    result[i] = byte;
   }
   
   return result;

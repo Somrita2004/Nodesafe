@@ -62,29 +62,36 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         
         setDownloadProgress(90);
         
-        // Create a download link for the decrypted file
-        const blob = new Blob([decryptedData]);
-        const url = URL.createObjectURL(blob);
-        
         // Figure out proper filename
         let downloadFilename = fileName;
         if (downloadFilename.endsWith('.encrypted') || downloadFilename.endsWith('.enc')) {
           downloadFilename = downloadFilename.replace(/\.(encrypted|enc)$/, '');
         }
         
-        // Create a temporary anchor and trigger download
+        // Create a Blob with the appropriate type if possible
+        const mimeType = getMimeType(downloadFilename);
+        const blob = new Blob([decryptedData], { type: mimeType || 'application/octet-stream' });
+        
+        // Create a download link and trigger the download
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = downloadFilename;
         document.body.appendChild(a);
-        a.click();
         
-        // Clean up
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        // Use a small delay to ensure the browser has time to process the blob
+        setTimeout(() => {
+          a.click();
+          
+          // Clean up
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 100);
+        }, 100);
         
         setDownloadProgress(100);
-        toast.success("File decrypted successfully!");
+        toast.success("File decrypted and downloaded successfully!");
       } catch (error) {
         console.error("Decryption failed:", error);
         setError("Incorrect password or corrupted file. Please try again.");
@@ -98,6 +105,39 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
     } finally {
       setDecrypting(false);
     }
+  };
+  
+  // Helper function to determine MIME type based on file extension
+  const getMimeType = (filename: string): string | null => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    
+    const mimeTypes: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'txt': 'text/plain',
+      'csv': 'text/csv',
+      'html': 'text/html',
+      'htm': 'text/html',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'svg': 'image/svg+xml',
+      'mp3': 'audio/mpeg',
+      'mp4': 'video/mp4',
+      'json': 'application/json',
+      'zip': 'application/zip',
+      'rar': 'application/x-rar-compressed',
+      'tar': 'application/x-tar',
+      'gz': 'application/gzip',
+    };
+    
+    return extension && extension in mimeTypes ? mimeTypes[extension] : null;
   };
   
   return (
