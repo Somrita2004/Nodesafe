@@ -2,11 +2,12 @@
 import React, { useState } from "react";
 import { Message } from "@/models/message";
 import { formatDate } from "@/lib/file-utils";
-import { Paperclip, Download, ArrowLeft, Lock } from "lucide-react";
+import { Paperclip, Download, ArrowLeft, Lock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getIpfsUrl } from "@/services/pinataService";
 import { decryptMessageContent } from "@/services/messagingService";
 import FileDecryption from "./FileDecryption";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MessageDetailProps {
   message: Message;
@@ -20,12 +21,20 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
   onBack
 }) => {
   const [showDecryption, setShowDecryption] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Decrypt message content if recipient
   const isRecipient = message.recipient.toLowerCase() === userAddress.toLowerCase();
-  const decryptedContent = isRecipient 
-    ? decryptMessageContent(message.content, userAddress)
-    : message.content;
+  let decryptedContent = message.content;
+  
+  try {
+    if (isRecipient) {
+      decryptedContent = decryptMessageContent(message.content, userAddress);
+    }
+  } catch (e) {
+    setError("Failed to decrypt message content");
+    console.error("Message decryption error:", e);
+  }
   
   const hasAttachment = message.attachments && message.attachments.length > 0;
   const attachment = hasAttachment ? message.attachments[0] : null;
@@ -56,7 +65,14 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
         </div>
         
         <div className="pt-4 border-t">
-          <div className="whitespace-pre-wrap">{decryptedContent}</div>
+          {error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="whitespace-pre-wrap">{decryptedContent}</div>
+          )}
         </div>
         
         {hasAttachment && attachment && (

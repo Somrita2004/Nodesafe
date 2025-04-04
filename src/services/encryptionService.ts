@@ -51,6 +51,27 @@ export async function decryptFile(
       password + salt
     );
     
+    // Check if decryption was successful - important security check
+    // If the password is wrong, the decrypted data will be empty
+    if (decrypted.sigBytes <= 0) {
+      throw new Error("Decryption failed: Invalid password");
+    }
+    
+    // Try to get a small sample and ensure it's valid data
+    // This is a heuristic to verify decryption worked correctly
+    try {
+      const sample = decrypted.toString(CryptoJS.enc.Utf8).substring(0, 10);
+      if (!sample || sample.length === 0) {
+        throw new Error("Decryption produced invalid data");
+      }
+    } catch (e) {
+      // If we can't convert to string, it's likely a binary file 
+      // which is fine, but we should verify the size is reasonable
+      if (decrypted.sigBytes < 10) { // Arbitrary small size check
+        throw new Error("Decryption failed: Corrupted data or wrong password");
+      }
+    }
+    
     // Convert to bytes
     const typedArray = convertWordArrayToUint8Array(decrypted);
     

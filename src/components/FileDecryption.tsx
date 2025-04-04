@@ -3,11 +3,12 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Download, FileText, Eye } from "lucide-react";
+import { Lock, Download, FileText, Eye, AlertCircle } from "lucide-react";
 import { decryptFile, getMimeType } from "@/services/encryptionService";
 import { getIpfsUrl } from "@/services/pinataService";
 import { toast } from "sonner";
 import PdfViewer from "./PdfViewer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface FileDecryptionProps {
   ipfsHash: string;
@@ -38,6 +39,8 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
     setDecrypting(true);
     setError(null);
     setDownloadProgress(10);
+    setDecryptedObjectUrl(null);
+    setDecryptedData(null);
     
     try {
       // Fetch the encrypted file from IPFS
@@ -61,7 +64,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
       toast.info("Decrypting file...");
       
       try {
-        // Decrypt the content
+        // Decrypt the content - this will throw an error if password is incorrect
         const decryptedData = await decryptFile(encryptedContent, password, salt);
         console.log("Decryption successful, data size:", decryptedData.byteLength);
         
@@ -122,12 +125,14 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         console.error("Decryption failed:", error);
         setError("Incorrect password or corrupted file. Please try again.");
         toast.error("Failed to decrypt file. Please check your password.");
+        setDownloadProgress(0);
       }
     } catch (error) {
       console.error("Download error:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to download file";
       setError(errorMessage);
       toast.error("Failed to download encrypted file.");
+      setDownloadProgress(0);
     } finally {
       setDecrypting(false);
     }
@@ -177,7 +182,11 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         </div>
         
         {error && (
-          <p className="text-sm text-destructive">{error}</p>
+          <Alert variant="destructive" className="py-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
         
         {downloadProgress > 0 && downloadProgress < 100 && (
