@@ -22,18 +22,25 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
 }) => {
   const [showDecryption, setShowDecryption] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [decryptionAttempted, setDecryptionAttempted] = useState(false);
   
   // Decrypt message content if recipient
   const isRecipient = message.recipient.toLowerCase() === userAddress.toLowerCase();
   let decryptedContent = message.content;
   
   try {
-    if (isRecipient) {
-      decryptedContent = decryptMessageContent(message.content, userAddress);
+    if (isRecipient && !decryptionAttempted) {
+      try {
+        decryptedContent = decryptMessageContent(message.content, userAddress);
+        setDecryptionAttempted(true);
+      } catch (e) {
+        console.error("Message decryption error:", e);
+        setError("Failed to decrypt message content");
+        setDecryptionAttempted(true);
+      }
     }
   } catch (e) {
-    setError("Failed to decrypt message content");
-    console.error("Message decryption error:", e);
+    console.error("Message decryption setup error:", e);
   }
   
   const hasAttachment = message.attachments && message.attachments.length > 0;
@@ -109,7 +116,7 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
                   <FileDecryption 
                     ipfsHash={attachment.ipfsHash}
                     fileName={attachment.name}
-                    salt={attachment.salt}
+                    salt={attachment.salt || ""}
                   />
                 </div>
               )}
