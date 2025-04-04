@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw, FileText } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -9,17 +9,22 @@ import { toast } from 'sonner';
 interface PdfViewerProps {
   pdfUrl: string;
   fileName: string;
+  binaryData?: ArrayBuffer;
   onBack?: () => void;
 }
 
-const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
+const PdfViewer: React.FC<PdfViewerProps> = ({ 
+  pdfUrl, 
+  fileName, 
+  binaryData,
+  onBack 
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const [renderedPages, setRenderedPages] = useState(0);
-  const [pdfLibLoaded, setPdfLibLoaded] = useState(false);
 
   useEffect(() => {
     // Load PDF.js from CDN
@@ -35,34 +40,125 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
       const pdfjsLib = window['pdfjs-dist/build/pdf'];
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       
-      // Load worker script explicitly
-      const workerScript = document.createElement('script');
-      workerScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      workerScript.integrity = 'sha512-fxAUpefhuHt7z7/kjMJ7nAQmtQzf2mKsf9JFpVLg/ZRNU8OVCQRxQvQZ4aDPy7Ce5ZJpKNn45IXaZ/NeQVRHw==';
-      workerScript.crossOrigin = 'anonymous';
-      workerScript.referrerPolicy = 'no-referrer';
-      workerScript.async = true;
+      // Define CMapPacked
+      pdfjsLib.CMapReaderFactory.PDFJS = pdfjsLib;
       
-      workerScript.onload = () => {
-        setPdfLibLoaded(true);
-      };
-      
-      document.body.appendChild(workerScript);
+      // Render the PDF after worker is loaded
+      if (binaryData) {
+        renderPdfFromData(binaryData);
+      } else if (pdfUrl) {
+        renderPdf(pdfUrl);
+      }
     };
 
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
-      // Don't try to remove worker script to avoid errors
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
     };
-  }, []);
+  }, [pdfUrl, binaryData]);
 
-  useEffect(() => {
-    if (pdfLibLoaded && pdfUrl) {
-      renderPdf(pdfUrl);
+  const renderPdfFromData = async (data: ArrayBuffer) => {
+    if (!containerRef.current) return;
+    
+    setLoading(true);
+    setError(null);
+    setLoadingProgress(0);
+    setPageCount(0);
+    setRenderedPages(0);
+    
+    try {
+      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+      
+      console.log("Loading PDF from binary data, size:", data.byteLength);
+      
+      // Set proper loading task
+      const loadingTask = pdfjsLib.getDocument({
+        data,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true
+      });
+      
+      // Track loading progress
+      loadingTask.onProgress = (progress: { loaded: number, total: number }) => {
+        console.log("Binary PDF Loading progress:", progress.loaded, "/", progress.total);
+        const percentage = progress.total ? Math.round((progress.loaded / progress.total) * 100) : 50;
+        setLoadingProgress(percentage);
+      };
+      
+      const pdf = await loadingTask.promise;
+      console.log("PDF loaded from binary data, pages:", pdf.numPages);
+      setPageCount(pdf.numPages);
+      
+      const container = containerRef.current;
+      container.innerHTML = ''; // Clear previous content
+      
+      // Function to render pages sequentially
+      const renderPage = async (pageNum: number) => {
+        try {
+          const page = await pdf.getPage(pageNum);
+          console.log(`Rendering page ${pageNum}`);
+          
+          // Create a div for this page
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'pdf-page mb-4';
+          container.appendChild(pageDiv);
+          
+          // Set viewport with a scale that works well for most PDFs
+          const viewport = page.getViewport({ scale: 1.5 });
+          
+          // Create canvas
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          canvas.className = 'mx-auto shadow-md';
+          pageDiv.appendChild(canvas);
+          
+          // Render PDF page
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+          
+          setRenderedPages(prev => {
+            console.log("Page rendered:", pageNum, "/", pdf.numPages);
+            return prev + 1;
+          });
+          
+          // Render next page if there are more
+          if (pageNum < pdf.numPages) {
+            setTimeout(() => renderPage(pageNum + 1), 10); // Small delay to prevent UI freezing
+          } else {
+            setLoading(false);
+            console.log("All pages rendered");
+          }
+        } catch (pageError) {
+          console.error(`Error rendering page ${pageNum}:`, pageError);
+          toast.error(`Failed to render page ${pageNum}`);
+          setRenderedPages(prev => prev + 1);
+          
+          // Continue with next page despite error
+          if (pageNum < pdf.numPages) {
+            setTimeout(() => renderPage(pageNum + 1), 10);
+          } else {
+            setLoading(false);
+          }
+        }
+      };
+      
+      // Start rendering from page 1
+      renderPage(1);
+      
+    } catch (error) {
+      console.error('Error loading PDF from binary data:', error);
+      setError('Failed to load PDF document. The file may be corrupted or in an unsupported format.');
+      setLoading(false);
+      toast.error('Failed to load PDF document');
     }
-  }, [pdfLibLoaded, pdfUrl]);
+  };
 
   const renderPdf = async (url: string) => {
     if (!containerRef.current) return;
@@ -169,8 +265,31 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
   };
 
   const handleRetry = () => {
-    renderPdf(pdfUrl);
+    if (binaryData) {
+      renderPdfFromData(binaryData);
+    } else {
+      renderPdf(pdfUrl);
+    }
   };
+
+  if (error) {
+    return (
+      <div className="text-center p-8 border rounded-lg bg-card">
+        <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+        <div className="text-red-500 text-xl mb-4">{error}</div>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" onClick={handleRetry}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+          </Button>
+          <Button variant="default" asChild>
+            <a href={pdfUrl} download={fileName}>
+              <Download className="mr-2 h-4 w-4" /> Download Instead
+            </a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pdf-viewer-container">
@@ -206,15 +325,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
             <div className="space-y-4">
               <Skeleton className="h-[400px] w-full rounded-md" />
               <Skeleton className="h-[400px] w-full rounded-md" />
-            </div>
-          )}
-          
-          {error && (
-            <div className="text-center p-8 border rounded-lg bg-card">
-              <div className="text-red-500 text-xl mb-4">{error}</div>
-              <Button variant="outline" onClick={handleRetry}>
-                <RefreshCw className="mr-2 h-4 w-4" /> Retry
-              </Button>
             </div>
           )}
         </div>

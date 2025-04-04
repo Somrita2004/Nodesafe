@@ -104,3 +104,38 @@ export function generateSecurePassword(length: number = 16): string {
   
   return result;
 }
+
+/**
+ * Get appropriate MIME type for a file based on its extension
+ */
+export function getMimeType(filename: string): string {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  
+  const mimeTypes: Record<string, string> = {
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'ppt': 'application/vnd.ms-powerpoint',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'txt': 'text/plain',
+    'csv': 'text/csv',
+    'html': 'text/html',
+    'htm': 'text/html',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'mp3': 'audio/mpeg',
+    'mp4': 'video/mp4',
+    'json': 'application/json',
+    'zip': 'application/zip',
+    'rar': 'application/x-rar-compressed',
+    'tar': 'application/x-tar',
+    'gz': 'application/gzip',
+  };
+  
+  return extension && extension in mimeTypes ? mimeTypes[extension] : 'application/octet-stream';
+}

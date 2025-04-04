@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Download, FileText, Eye } from "lucide-react";
-import { decryptFile } from "@/services/encryptionService";
+import { decryptFile, getMimeType } from "@/services/encryptionService";
 import { getIpfsUrl } from "@/services/pinataService";
 import { toast } from "sonner";
 import PdfViewer from "./PdfViewer";
@@ -25,6 +25,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [decryptedObjectUrl, setDecryptedObjectUrl] = useState<string | null>(null);
+  const [decryptedData, setDecryptedData] = useState<ArrayBuffer | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [decryptedFileName, setDecryptedFileName] = useState(fileName);
   
@@ -73,10 +74,11 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         }
         
         setDecryptedFileName(downloadFilename);
+        setDecryptedData(decryptedData);
         
         // Create a Blob with the appropriate type
         const mimeType = getMimeType(downloadFilename);
-        const blob = new Blob([decryptedData], { type: mimeType || 'application/octet-stream' });
+        const blob = new Blob([decryptedData], { type: mimeType });
         
         // Create a URL for the blob
         const objectUrl = URL.createObjectURL(blob);
@@ -87,7 +89,7 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         
         if (shouldOpenInBrowser) {
           if (mimeType === 'application/pdf') {
-            // For PDFs, use our custom PDF viewer
+            // For PDFs, use our custom PDF viewer with direct data
             setShowPdfViewer(true);
             toast.success("PDF decrypted successfully");
           } else {
@@ -140,43 +142,11 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
     };
   }, [decryptedObjectUrl]);
   
-  // Helper function to determine MIME type based on file extension
-  const getMimeType = (filename: string): string | null => {
-    const extension = filename.split('.').pop()?.toLowerCase();
-    
-    const mimeTypes: Record<string, string> = {
-      'pdf': 'application/pdf',
-      'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'xls': 'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'ppt': 'application/vnd.ms-powerpoint',
-      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'txt': 'text/plain',
-      'csv': 'text/csv',
-      'html': 'text/html',
-      'htm': 'text/html',
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'gif': 'image/gif',
-      'svg': 'image/svg+xml',
-      'mp3': 'audio/mpeg',
-      'mp4': 'video/mp4',
-      'json': 'application/json',
-      'zip': 'application/zip',
-      'rar': 'application/x-rar-compressed',
-      'tar': 'application/x-tar',
-      'gz': 'application/gzip',
-    };
-    
-    return extension && extension in mimeTypes ? mimeTypes[extension] : null;
-  };
-  
-  if (showPdfViewer && decryptedObjectUrl) {
+  if (showPdfViewer && (decryptedObjectUrl || decryptedData)) {
     return (
       <PdfViewer 
-        pdfUrl={decryptedObjectUrl} 
+        pdfUrl={decryptedObjectUrl || ''}
+        binaryData={decryptedData || undefined} 
         fileName={decryptedFileName}
         onBack={() => setShowPdfViewer(false)}
       />
