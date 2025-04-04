@@ -19,6 +19,50 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const [renderedPages, setRenderedPages] = useState(0);
+  const [pdfLibLoaded, setPdfLibLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load PDF.js from CDN
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.integrity = 'sha512-q+4lp0ZtFwdE7Z0Ivy6QQtA7zS0Ut5UJUHjsX3VpZqLRVHr+uRgb3N6N/Uk/HxpyoUmXd/4BDvvid9sKUvxpRw==';
+    script.crossOrigin = 'anonymous';
+    script.referrerPolicy = 'no-referrer';
+    script.async = true;
+
+    script.onload = () => {
+      // Define workerSrc
+      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      
+      // Load worker script explicitly
+      const workerScript = document.createElement('script');
+      workerScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      workerScript.integrity = 'sha512-fxAUpefhuHt7z7/kjMJ7nAQmtQzf2mKsf9JFpVLg/ZRNU8OVCQRxQvQZ4aDPy7Ce5ZJpKNn45IXaZ/NeQVRHw==';
+      workerScript.crossOrigin = 'anonymous';
+      workerScript.referrerPolicy = 'no-referrer';
+      workerScript.async = true;
+      
+      workerScript.onload = () => {
+        setPdfLibLoaded(true);
+      };
+      
+      document.body.appendChild(workerScript);
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+      // Don't try to remove worker script to avoid errors
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pdfLibLoaded && pdfUrl) {
+      renderPdf(pdfUrl);
+    }
+  }, [pdfLibLoaded, pdfUrl]);
 
   const renderPdf = async (url: string) => {
     if (!containerRef.current) return;
@@ -31,6 +75,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
     
     try {
       const pdfjsLib = window['pdfjs-dist/build/pdf'];
+
+      // Make sure we have the URL properly set
+      console.log("Loading PDF from URL:", url);
       
       // Set proper caching options
       const loadingTask = pdfjsLib.getDocument({
@@ -44,11 +91,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
       
       // Track loading progress
       loadingTask.onProgress = (progress: { loaded: number, total: number }) => {
+        console.log("PDF Loading progress:", progress.loaded, "/", progress.total);
         const percentage = progress.total ? Math.round((progress.loaded / progress.total) * 100) : 0;
         setLoadingProgress(percentage);
       };
       
       const pdf = await loadingTask.promise;
+      console.log("PDF loaded, pages:", pdf.numPages);
       setPageCount(pdf.numPages);
       
       const container = containerRef.current;
@@ -58,6 +107,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
       const renderPage = async (pageNum: number) => {
         try {
           const page = await pdf.getPage(pageNum);
+          console.log(`Rendering page ${pageNum}`);
           
           // Create a div for this page
           const pageDiv = document.createElement('div');
@@ -81,13 +131,17 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
             viewport: viewport
           }).promise;
           
-          setRenderedPages(prev => prev + 1);
+          setRenderedPages(prev => {
+            console.log("Page rendered:", pageNum, "/", pdf.numPages);
+            return prev + 1;
+          });
           
           // Render next page if there are more
           if (pageNum < pdf.numPages) {
             setTimeout(() => renderPage(pageNum + 1), 10); // Small delay to prevent UI freezing
           } else {
             setLoading(false);
+            console.log("All pages rendered");
           }
         } catch (pageError) {
           console.error(`Error rendering page ${pageNum}:`, pageError);
@@ -113,48 +167,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, fileName, onBack }) => {
       toast.error('Failed to load PDF document');
     }
   };
-
-  useEffect(() => {
-    // Load PDF.js from CDN
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.integrity = 'sha512-q+4lp0ZtFwdE7Z0Ivy6QQtA7zS0Ut5UJUHjsX3VpZqLRVHr+uRgb3N6N/Uk/HxpyoUmXd/4BDvvid9sKUvxpRw==';
-    script.crossOrigin = 'anonymous';
-    script.referrerPolicy = 'no-referrer';
-    script.async = true;
-
-    let workerScript: HTMLScriptElement | null = null;
-
-    script.onload = () => {
-      // Define workerSrc
-      const pdfjsLib = window['pdfjs-dist/build/pdf'];
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-      // Load worker script explicitly
-      workerScript = document.createElement('script');
-      workerScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      workerScript.integrity = 'sha512-fxAUpefhuHt7z7/kjMJ7nAQmtQzf2mKsf9JFpVLg/ZRNU8OVCQRxQvQZ4aDPy7Ce5ZJpKNn45IXaZ/NeQVRHw==';
-      workerScript.crossOrigin = 'anonymous';
-      workerScript.referrerPolicy = 'no-referrer';
-      workerScript.async = true;
-      
-      workerScript.onload = () => {
-        // Load and render the PDF
-        renderPdf(pdfUrl);
-      };
-      
-      document.body.appendChild(workerScript);
-    };
-
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-      if (workerScript) {
-        document.body.removeChild(workerScript);
-      }
-    };
-  }, [pdfUrl]);
 
   const handleRetry = () => {
     renderPdf(pdfUrl);

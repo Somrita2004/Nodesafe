@@ -74,29 +74,31 @@ const FileDecryption: React.FC<FileDecryptionProps> = ({
         
         setDecryptedFileName(downloadFilename);
         
-        // Create a Blob with the appropriate type if possible
+        // Create a Blob with the appropriate type
         const mimeType = getMimeType(downloadFilename);
         const blob = new Blob([decryptedData], { type: mimeType || 'application/octet-stream' });
         
         // Create a URL for the blob
-        const url = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob);
+        console.log("Created object URL:", objectUrl);
         
         // Save the URL for in-browser viewing
-        setDecryptedObjectUrl(url);
+        setDecryptedObjectUrl(objectUrl);
         
         if (shouldOpenInBrowser) {
           if (mimeType === 'application/pdf') {
             // For PDFs, use our custom PDF viewer
             setShowPdfViewer(true);
+            toast.success("PDF decrypted successfully");
           } else {
             // For other file types, just open in a new tab
-            window.open(url, '_blank');
+            window.open(objectUrl, '_blank');
             toast.success("File opened in a new tab");
           }
         } else {
           // Create a download link and trigger the download
           const a = document.createElement('a');
-          a.href = url;
+          a.href = objectUrl;
           a.download = downloadFilename;
           document.body.appendChild(a);
           
